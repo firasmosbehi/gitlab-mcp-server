@@ -19,6 +19,8 @@ npm install
 
 - `GITLAB_TOKEN` (required): GitLab Personal Access Token
 - `GITLAB_HOST` (optional): defaults to `https://gitlab.com`
+- `GITLAB_USER_AGENT` (optional): defaults to `gitlab-mcp-server/<version>`
+- `LOG_LEVEL` (optional): `error|warn|info|debug` (default: `info`)
 
 ## Run Locally
 
@@ -38,6 +40,25 @@ npm start
 
 ```bash
 npx @modelcontextprotocol/inspector node dist/index.js
+```
+
+## Example MCP Client Config
+
+Most MCP clients take a stdio command plus environment variables. Example shape:
+
+```json
+{
+  "mcpServers": {
+    "gitlab": {
+      "command": "node",
+      "args": ["./dist/index.js"],
+      "env": {
+        "GITLAB_TOKEN": "YOUR_TOKEN_HERE",
+        "GITLAB_HOST": "https://gitlab.com"
+      }
+    }
+  }
+}
 ```
 
 ## Docker
@@ -64,4 +85,3 @@ Tool names exposed by this server:
 ## Security
 
 Treat `GITLAB_TOKEN` like a password. Prefer least-privilege tokens and avoid granting write scopes unless you need them.
-
