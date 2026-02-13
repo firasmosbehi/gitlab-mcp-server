@@ -107,6 +107,16 @@ export interface GitLabFacade {
 
 type AnyGitlab = any;
 
+class GitlabFetchError extends Error {
+  public readonly response: { status: number };
+
+  constructor(status: number, message: string) {
+    super(message);
+    this.name = "GitlabFetchError";
+    this.response = { status };
+  }
+}
+
 function sleep(ms: number): Promise<void> {
   return new Promise((resolve) => setTimeout(resolve, ms));
 }
@@ -155,6 +165,34 @@ export function createGitlabFacade(config: Config, logger: Logger): GitLabFacade
     host: config.gitlabHost,
     token: config.gitlabToken,
   });
+
+  async function fetchJson<T>(
+    path: string,
+    query?: Record<string, string | number | undefined>,
+  ): Promise<T> {
+    const base = `${config.gitlabHost}/api/v4`;
+    const url = new URL(`${base}${path}`);
+    for (const [k, v] of Object.entries(query ?? {})) {
+      if (v === undefined) continue;
+      url.searchParams.set(k, String(v));
+    }
+
+    const res = await fetch(url, {
+      headers: {
+        "PRIVATE-TOKEN": config.gitlabToken,
+        "User-Agent": config.gitlabUserAgent,
+        Accept: "application/json",
+      },
+    });
+
+    if (!res.ok) {
+      const text = await res.text().catch(() => "");
+      const snippet = text.length > 500 ? `${text.slice(0, 500)}...` : text;
+      throw new GitlabFetchError(res.status, `GitLab API error (${res.status}): ${snippet}`);
+    }
+
+    return (await res.json()) as T;
+  }
 
   const defaultBranchCache = new Map<string, string>();
 
@@ -298,7 +336,13 @@ export function createGitlabFacade(config: Config, logger: Logger): GitLabFacade
     },
 
     async listPipelineJobs(project, pipelineId) {
-      const jobs = await withRetry(logger, () => api.PipelineJobs.all(project, pipelineId));
+      const jobs = await withRetry<any[]>(logger, () =>
+        fetchJson<any[]>(
+          `/projects/${encodeURIComponent(project)}/pipelines/${pipelineId}/jobs`,
+          { per_page: 100, page: 1 },
+        ),
+      );
+
       return (jobs as any[]).map((j) => ({
         id: j.id,
         name: j.name,
