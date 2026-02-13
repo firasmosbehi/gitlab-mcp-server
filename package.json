@@ -1,0 +1,46 @@
+{
+  "name": "gitlab-mcp-server",
+  "version": "0.1.0",
+  "description": "Model Context Protocol (MCP) server for GitLab: issues, merge requests, repository files, and CI pipelines.",
+  "type": "module",
+  "license": "Apache-2.0",
+  "author": "Firas Mosbehi",
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/firasmosbehi/gitlab-mcp-server.git"
+  },
+  "keywords": [
+    "mcp",
+    "model-context-protocol",
+    "gitlab",
+    "typescript",
+    "llm",
+    "agent"
+  ],
+  "engines": {
+    "node": ">=20"
+  },
+  "bin": {
+    "gitlab-mcp-server": "dist/index.js"
+  },
+  "scripts": {
+    "dev": "tsx src/index.ts",
+    "build": "tsup",
+    "start": "node dist/index.js",
+    "typecheck": "tsc --noEmit",
+    "test": "vitest run"
+  },
+  "dependencies": {
+    "@gitbeaker/rest": "^43.4.0",
+    "@modelcontextprotocol/sdk": "^1.7.0",
+    "zod": "^3.24.1"
+  },
+  "devDependencies": {
+    "@types/node": "^22.13.4",
+    "tsup": "^8.3.6",
+    "tsx": "^4.19.2",
+    "typescript": "^5.7.3",
+    "vitest": "^2.1.8"
+  }
+}
+
