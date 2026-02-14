@@ -1,5 +1,10 @@
 # Changelog
 
+## 1.1.0
+
+- Issues: create/update issues; list/add issue notes (comments).
+- Merge requests: list/add merge request notes (comments).
+
 ## 1.0.2
 
 - Packaging: publish to npm as `gitlab-mcp-server-firasmosbehi` (unscoped) for compatibility with npm scopes.

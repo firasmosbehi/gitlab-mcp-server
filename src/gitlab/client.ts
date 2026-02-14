@@ -75,6 +75,16 @@ export type JobLogTail = Readonly<{
   bytes_end?: number;
 }>;
 
+export type NoteSummary = Readonly<{
+  id: number;
+  body: string;
+  author_username?: string;
+  author_name?: string;
+  created_at: string;
+  system?: boolean;
+  web_url?: string;
+}>;
+
 export type JobArtifactsMetadata = Readonly<{
   job_id: number;
   filename?: string;
@@ -193,8 +203,37 @@ export type ListPipelinesParams = Readonly<{
 export interface GitLabFacade {
   searchIssues: (params: SearchIssuesParams) => Promise<IssueSummary[]>;
   getIssue: (project: string, iid: number) => Promise<IssueDetail>;
+  createIssue: (
+    project: string,
+    title: string,
+    options?: { description?: string; labels?: string[] | string },
+  ) => Promise<IssueSummary>;
+  updateIssue: (
+    project: string,
+    iid: number,
+    options: {
+      title?: string;
+      description?: string;
+      stateEvent?: "close" | "reopen";
+      labels?: string[] | string;
+      addLabels?: string[] | string;
+      removeLabels?: string[] | string;
+    },
+  ) => Promise<IssueSummary>;
+  listIssueNotes: (
+    project: string,
+    iid: number,
+    options: { page: number; per_page: number },
+  ) => Promise<NoteSummary[]>;
+  addIssueNote: (project: string, iid: number, body: string) => Promise<NoteSummary>;
   listMergeRequests: (params: ListMergeRequestsParams) => Promise<MergeRequestSummary[]>;
   getMergeRequest: (project: string, iid: number) => Promise<MergeRequestDetail>;
+  listMergeRequestNotes: (
+    project: string,
+    iid: number,
+    options: { page: number; per_page: number },
+  ) => Promise<NoteSummary[]>;
+  addMergeRequestNote: (project: string, iid: number, body: string) => Promise<NoteSummary>;
   getFile: (project: string, filePath: string, ref?: string) => Promise<RepoFile>;
   listRepoTree: (params: RepoTreeParams) => Promise<RepoTreeEntry[]>;
   searchCode: (params: CodeSearchParams) => Promise<CodeSearchMatch[]>;
@@ -560,6 +599,25 @@ export function createGitlabFacade(config: Config, logger: Logger): GitLabFacade
     return branch;
   }
 
+  function mapNote(n: any): NoteSummary {
+    const author = n?.author;
+    const id = typeof n?.id === "number" ? n.id : Number(n?.id);
+    return {
+      id: Number.isFinite(id) ? id : 0,
+      body: typeof n?.body === "string" ? n.body : "",
+      author_username: typeof author?.username === "string" ? author.username : undefined,
+      author_name: typeof author?.name === "string" ? author.name : undefined,
+      created_at: typeof n?.created_at === "string" ? n.created_at : "",
+      system: typeof n?.system === "boolean" ? n.system : undefined,
+      web_url:
+        typeof n?.web_url === "string"
+          ? n.web_url
+          : typeof n?.url === "string"
+            ? n.url
+            : undefined,
+    };
+  }
+
   return {
     async searchIssues(params) {
       const issues = await withRetry(logger, async () => {
@@ -602,6 +660,101 @@ export function createGitlabFacade(config: Config, logger: Logger): GitLabFacade
       };
     },
 
+    async createIssue(project, title, options) {
+      const payload: any = { title };
+      if (options?.description !== undefined) payload.description = options.description;
+      if (options?.labels !== undefined) {
+        payload.labels = Array.isArray(options.labels) ? options.labels.join(",") : options.labels;
+      }
+
+      const issue = await withRetry<any>(logger, () =>
+        fetchJson<any>(`/projects/${encodeURIComponent(project)}/issues`, undefined, {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify(payload),
+        }),
+      );
+
+      return {
+        iid: issue.iid,
+        title: issue.title,
+        state: issue.state,
+        labels: Array.isArray(issue.labels) ? issue.labels : [],
+        web_url: issue.web_url,
+        updated_at: issue.updated_at,
+      };
+    },
+
+    async updateIssue(project, iid, options) {
+      const payload: any = {};
+      if (options.title !== undefined) payload.title = options.title;
+      if (options.description !== undefined) payload.description = options.description;
+      if (options.stateEvent !== undefined) payload.state_event = options.stateEvent;
+      if (options.labels !== undefined) {
+        payload.labels = Array.isArray(options.labels) ? options.labels.join(",") : options.labels;
+      }
+      if (options.addLabels !== undefined) {
+        payload.add_labels = Array.isArray(options.addLabels)
+          ? options.addLabels.join(",")
+          : options.addLabels;
+      }
+      if (options.removeLabels !== undefined) {
+        payload.remove_labels = Array.isArray(options.removeLabels)
+          ? options.removeLabels.join(",")
+          : options.removeLabels;
+      }
+
+      if (Object.keys(payload).length === 0) {
+        throw new Error("No updates provided.");
+      }
+
+      const issue = await withRetry<any>(logger, () =>
+        fetchJson<any>(
+          `/projects/${encodeURIComponent(project)}/issues/${encodeURIComponent(String(iid))}`,
+          undefined,
+          {
+            method: "PUT",
+            headers: { "Content-Type": "application/json" },
+            body: JSON.stringify(payload),
+          },
+        ),
+      );
+
+      return {
+        iid: issue.iid,
+        title: issue.title,
+        state: issue.state,
+        labels: Array.isArray(issue.labels) ? issue.labels : [],
+        web_url: issue.web_url,
+        updated_at: issue.updated_at,
+      };
+    },
+
+    async listIssueNotes(project, iid, options) {
+      const notes = await withRetry<any[]>(logger, () =>
+        fetchJson<any[]>(
+          `/projects/${encodeURIComponent(project)}/issues/${encodeURIComponent(String(iid))}/notes`,
+          { page: options.page, per_page: options.per_page },
+        ),
+      );
+      return notes.map(mapNote);
+    },
+
+    async addIssueNote(project, iid, body) {
+      const note = await withRetry<any>(logger, () =>
+        fetchJson<any>(
+          `/projects/${encodeURIComponent(project)}/issues/${encodeURIComponent(String(iid))}/notes`,
+          undefined,
+          {
+            method: "POST",
+            headers: { "Content-Type": "application/json" },
+            body: JSON.stringify({ body }),
+          },
+        ),
+      );
+      return mapNote(note);
+    },
+
     async listMergeRequests(params) {
       const mrs = await withRetry(logger, async () => {
         return api.MergeRequests.all({
@@ -638,6 +791,31 @@ export function createGitlabFacade(config: Config, logger: Logger): GitLabFacade
         created_at: mr.created_at,
         description: mr.description ?? "",
       };
+    },
+
+    async listMergeRequestNotes(project, iid, options) {
+      const notes = await withRetry<any[]>(logger, () =>
+        fetchJson<any[]>(
+          `/projects/${encodeURIComponent(project)}/merge_requests/${encodeURIComponent(String(iid))}/notes`,
+          { page: options.page, per_page: options.per_page },
+        ),
+      );
+      return notes.map(mapNote);
+    },
+
+    async addMergeRequestNote(project, iid, body) {
+      const note = await withRetry<any>(logger, () =>
+        fetchJson<any>(
+          `/projects/${encodeURIComponent(project)}/merge_requests/${encodeURIComponent(String(iid))}/notes`,
+          undefined,
+          {
+            method: "POST",
+            headers: { "Content-Type": "application/json" },
+            body: JSON.stringify({ body }),
+          },
+        ),
+      );
+      return mapNote(note);
     },
 
     async getFile(project, filePath, ref) {

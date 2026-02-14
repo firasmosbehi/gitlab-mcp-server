@@ -4,8 +4,8 @@ Model Context Protocol (MCP) server for GitLab: issues, merge requests, reposito
 
 ## Features
 
-- Issues: search and fetch issue details
-- Merge Requests: list and fetch MR details
+- Issues: search/fetch/create/update; list/add notes (comments)
+- Merge Requests: list/fetch; list/add notes (comments)
 - Repo files: read a file from a ref (branch/tag/sha)
 - Repo navigation: list repo tree, search code
 - MR context: bounded diff summaries via MR changes
@@ -143,8 +143,10 @@ Tool names exposed by this server:
 
 - `gitlab_search_issues`
 - `gitlab_get_issue`
+- `gitlab_list_issue_notes`
 - `gitlab_list_merge_requests`
 - `gitlab_get_merge_request`
+- `gitlab_list_merge_request_notes`
 - `gitlab_get_file`
 - `gitlab_list_repo_tree`
 - `gitlab_search_code`
@@ -157,6 +159,10 @@ Tool names exposed by this server:
 - `gitlab_get_job_artifacts`
 - `gitlab_download_job_artifacts`
 - `gitlab_get_merge_request_changes`
+- `gitlab_create_issue`
+- `gitlab_update_issue`
+- `gitlab_add_issue_note`
+- `gitlab_add_merge_request_note`
 - `gitlab_create_branch`
 - `gitlab_create_commit`
 - `gitlab_create_merge_request`
