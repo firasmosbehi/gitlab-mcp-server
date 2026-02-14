@@ -20,7 +20,7 @@ Model Context Protocol (MCP) server for GitLab: issues, merge requests, reposito
 From npm (recommended):
 
 ```bash
-npm i -g @firasmosbehi/gitlab-mcp-server
+npm i -g gitlab-mcp-server-firasmosbehi
 ```
 
 This installs the `gitlab-mcp-server` CLI.

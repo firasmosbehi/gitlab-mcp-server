@@ -1,5 +1,9 @@
 # Changelog
 
+## 1.0.2
+
+- Packaging: publish to npm as `gitlab-mcp-server-firasmosbehi` (unscoped) for compatibility with npm scopes.
+
 ## 1.0.1
 
 - Packaging: publish to npm as `@firasmosbehi/gitlab-mcp-server` (scoped) to avoid name conflicts.
