@@ -85,6 +85,43 @@ export type NoteSummary = Readonly<{
   web_url?: string;
 }>;
 
+export type CurrentUser = Readonly<{
+  id: number;
+  username: string;
+  name: string;
+  web_url?: string;
+}>;
+
+export type ProjectSummary = Readonly<{
+  id: number;
+  name: string;
+  path_with_namespace: string;
+  web_url: string;
+  default_branch?: string;
+}>;
+
+export type BranchSummary = Readonly<{
+  name: string;
+  default?: boolean;
+  protected?: boolean;
+  web_url?: string;
+  commit_sha?: string;
+}>;
+
+export type TagSummary = Readonly<{
+  name: string;
+  message?: string;
+  target?: string;
+  commit_sha?: string;
+}>;
+
+export type ProjectLabelSummary = Readonly<{
+  id: number;
+  name: string;
+  description?: string;
+  color?: string;
+}>;
+
 export type JobArtifactsMetadata = Readonly<{
   job_id: number;
   filename?: string;
@@ -234,6 +271,34 @@ export interface GitLabFacade {
     options: { page: number; per_page: number },
   ) => Promise<NoteSummary[]>;
   addMergeRequestNote: (project: string, iid: number, body: string) => Promise<NoteSummary>;
+
+  getCurrentUser: () => Promise<CurrentUser>;
+  listProjects: (options: {
+    search?: string;
+    membership?: boolean;
+    page: number;
+    per_page: number;
+  }) => Promise<ProjectSummary[]>;
+  getProject: (project: string) => Promise<ProjectSummary>;
+  listBranches: (options: {
+    project: string;
+    search?: string;
+    page: number;
+    per_page: number;
+  }) => Promise<BranchSummary[]>;
+  listTags: (options: {
+    project: string;
+    search?: string;
+    page: number;
+    per_page: number;
+  }) => Promise<TagSummary[]>;
+  listProjectLabels: (options: {
+    project: string;
+    search?: string;
+    page: number;
+    per_page: number;
+  }) => Promise<ProjectLabelSummary[]>;
+
   getFile: (project: string, filePath: string, ref?: string) => Promise<RepoFile>;
   listRepoTree: (params: RepoTreeParams) => Promise<RepoTreeEntry[]>;
   searchCode: (params: CodeSearchParams) => Promise<CodeSearchMatch[]>;
@@ -816,6 +881,118 @@ export function createGitlabFacade(config: Config, logger: Logger): GitLabFacade
         ),
       );
       return mapNote(note);
+    },
+
+    async getCurrentUser() {
+      const user = await withRetry<any>(logger, () => fetchJson<any>(`/user`));
+      const id = typeof user?.id === "number" ? user.id : Number(user?.id);
+      return {
+        id: Number.isFinite(id) ? id : 0,
+        username: user?.username ?? "",
+        name: user?.name ?? "",
+        web_url: user?.web_url,
+      };
+    },
+
+    async listProjects(options) {
+      const projects = await withRetry<any[]>(logger, () =>
+        fetchJson<any[]>(`/projects`, {
+          search: options.search,
+          membership: options.membership ? "true" : undefined,
+          simple: "true",
+          order_by: "last_activity_at",
+          sort: "desc",
+          page: options.page,
+          per_page: options.per_page,
+        }),
+      );
+
+      return projects.map((p) => {
+        const id = typeof p?.id === "number" ? p.id : Number(p?.id);
+        return {
+          id: Number.isFinite(id) ? id : 0,
+          name: p?.name ?? "",
+          path_with_namespace: p?.path_with_namespace ?? "",
+          web_url: p?.web_url ?? "",
+          default_branch: typeof p?.default_branch === "string" ? p.default_branch : undefined,
+        };
+      });
+    },
+
+    async getProject(project) {
+      const p = await withRetry<any>(logger, () => api.Projects.show(project));
+      const id = typeof p?.id === "number" ? p.id : Number(p?.id);
+      return {
+        id: Number.isFinite(id) ? id : 0,
+        name: p?.name ?? "",
+        path_with_namespace: p?.path_with_namespace ?? "",
+        web_url: p?.web_url ?? "",
+        default_branch: typeof p?.default_branch === "string" ? p.default_branch : undefined,
+      };
+    },
+
+    async listBranches(options) {
+      const branches = await withRetry<any[]>(logger, () =>
+        fetchJson<any[]>(
+          `/projects/${encodeURIComponent(options.project)}/repository/branches`,
+          {
+            search: options.search,
+            page: options.page,
+            per_page: options.per_page,
+          },
+        ),
+      );
+
+      return branches.map((b) => ({
+        name: b?.name ?? "",
+        default: typeof b?.default === "boolean" ? b.default : undefined,
+        protected: typeof b?.protected === "boolean" ? b.protected : undefined,
+        web_url: typeof b?.web_url === "string" ? b.web_url : undefined,
+        commit_sha: typeof b?.commit?.id === "string" ? b.commit.id : undefined,
+      }));
+    },
+
+    async listTags(options) {
+      const tags = await withRetry<any[]>(logger, () =>
+        fetchJson<any[]>(
+          `/projects/${encodeURIComponent(options.project)}/repository/tags`,
+          {
+            search: options.search,
+            page: options.page,
+            per_page: options.per_page,
+          },
+        ),
+      );
+
+      return tags.map((t) => ({
+        name: t?.name ?? "",
+        message: typeof t?.message === "string" ? t.message : undefined,
+        target: typeof t?.target === "string" ? t.target : undefined,
+        commit_sha: typeof t?.commit?.id === "string" ? t.commit.id : undefined,
+      }));
+    },
+
+    async listProjectLabels(options) {
+      const labels = await withRetry<any[]>(logger, () =>
+        fetchJson<any[]>(
+          `/projects/${encodeURIComponent(options.project)}/labels`,
+          {
+            search: options.search,
+            page: options.page,
+            per_page: options.per_page,
+          },
+        ),
+      );
+
+      return labels.map((l) => {
+        const id = typeof l?.id === "number" ? l.id : Number(l?.id);
+        return {
+          id: Number.isFinite(id) ? id : 0,
+          name: l?.name ?? "",
+          description: typeof l?.description === "string" ? l.description : undefined,
+          color: typeof l?.color === "string" ? l.color : undefined,
+        };
+      });
     },
 
     async getFile(project, filePath, ref) {

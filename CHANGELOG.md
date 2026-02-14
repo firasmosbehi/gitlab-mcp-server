@@ -1,5 +1,9 @@
 # Changelog
 
+## 1.2.0
+
+- Project discovery: current user, list projects, project details, branches/tags/labels.
+
 ## 1.1.0
 
 - Issues: create/update issues; list/add issue notes (comments).

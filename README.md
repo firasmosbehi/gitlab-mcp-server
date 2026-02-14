@@ -4,6 +4,7 @@ Model Context Protocol (MCP) server for GitLab: issues, merge requests, reposito
 
 ## Features
 
+- Project discovery: current user, list projects, project details, branches/tags/labels
 - Issues: search/fetch/create/update; list/add notes (comments)
 - Merge Requests: list/fetch; list/add notes (comments)
 - Repo files: read a file from a ref (branch/tag/sha)
@@ -141,6 +142,12 @@ docker run -p 3000:3000 \\
 
 Tool names exposed by this server:
 
+- `gitlab_get_current_user`
+- `gitlab_list_projects`
+- `gitlab_get_project`
+- `gitlab_list_branches`
+- `gitlab_list_tags`
+- `gitlab_list_project_labels`
 - `gitlab_search_issues`
 - `gitlab_get_issue`
 - `gitlab_list_issue_notes`
