@@ -17,6 +17,7 @@ const Schema = z.object({
 export const gitlabSearchIssuesTool: ToolDef<typeof Schema, unknown> = {
   name: "gitlab_search_issues",
   description: "Search issues within a GitLab project.",
+  access: "read",
   inputSchema: {
     type: "object",
     additionalProperties: false,
@@ -46,4 +47,3 @@ export const gitlabSearchIssuesTool: ToolDef<typeof Schema, unknown> = {
     });
   },
 };
-

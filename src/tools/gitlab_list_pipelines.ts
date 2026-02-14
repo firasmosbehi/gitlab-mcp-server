@@ -14,6 +14,7 @@ const Schema = z.object({
 export const gitlabListPipelinesTool: ToolDef<typeof Schema, unknown> = {
   name: "gitlab_list_pipelines",
   description: "List GitLab pipelines for a project.",
+  access: "read",
   inputSchema: {
     type: "object",
     additionalProperties: false,
@@ -37,4 +38,3 @@ export const gitlabListPipelinesTool: ToolDef<typeof Schema, unknown> = {
     });
   },
 };
-

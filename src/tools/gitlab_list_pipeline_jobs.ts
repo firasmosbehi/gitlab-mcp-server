@@ -10,6 +10,7 @@ const Schema = z.object({
 export const gitlabListPipelineJobsTool: ToolDef<typeof Schema, unknown> = {
   name: "gitlab_list_pipeline_jobs",
   description: "List jobs for a given GitLab pipeline.",
+  access: "read",
   inputSchema: {
     type: "object",
     additionalProperties: false,
@@ -24,4 +25,3 @@ export const gitlabListPipelineJobsTool: ToolDef<typeof Schema, unknown> = {
     return ctx.gitlab.listPipelineJobs(args.project, args.pipeline_id);
   },
 };
-

@@ -10,6 +10,7 @@ const Schema = z.object({
 export const gitlabGetPipelineTool: ToolDef<typeof Schema, unknown> = {
   name: "gitlab_get_pipeline",
   description: "Fetch a single GitLab pipeline by ID.",
+  access: "read",
   inputSchema: {
     type: "object",
     additionalProperties: false,
@@ -24,4 +25,3 @@ export const gitlabGetPipelineTool: ToolDef<typeof Schema, unknown> = {
     return ctx.gitlab.getPipeline(args.project, args.pipeline_id);
   },
 };
-

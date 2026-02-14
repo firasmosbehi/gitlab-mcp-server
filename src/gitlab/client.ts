@@ -66,6 +66,39 @@ export type RepoFile = Readonly<{
   size_bytes: number;
 }>;
 
+export type CreatedBranch = Readonly<{
+  name: string;
+  web_url: string;
+  commit_sha: string;
+}>;
+
+export type CommitActionInput = Readonly<{
+  action: "create" | "update" | "delete";
+  filePath: string;
+  content?: string;
+  encoding?: "text" | "base64";
+  lastCommitId?: string;
+}>;
+
+export type CreatedCommit = Readonly<{
+  id: string;
+  short_id: string;
+  title: string;
+  message: string;
+  web_url: string;
+  created_at?: string;
+}>;
+
+export type CreatedMergeRequest = Readonly<{
+  iid: number;
+  title: string;
+  state: string;
+  web_url: string;
+  source_branch: string;
+  target_branch: string;
+  created_at?: string;
+}>;
+
 export type SearchIssuesParams = Readonly<{
   project: string;
   query?: string;
@@ -103,6 +136,28 @@ export interface GitLabFacade {
   getPipeline: (project: string, pipelineId: number) => Promise<PipelineDetail>;
   listPipelineJobs: (project: string, pipelineId: number) => Promise<PipelineJobSummary[]>;
   getJobLog: (project: string, jobId: number) => Promise<string>;
+
+  createBranch: (project: string, branchName: string, ref?: string) => Promise<CreatedBranch>;
+  createCommit: (
+    project: string,
+    branch: string,
+    message: string,
+    actions: CommitActionInput[],
+    options?: { startBranch?: string },
+  ) => Promise<CreatedCommit>;
+  createMergeRequest: (
+    project: string,
+    sourceBranch: string,
+    targetBranch: string | undefined,
+    title: string,
+    options?: {
+      description?: string;
+      labels?: string[] | string;
+      removeSourceBranch?: boolean;
+      assigneeId?: number;
+      reviewerIds?: number[];
+    },
+  ) => Promise<CreatedMergeRequest>;
 }
 
 type AnyGitlab = any;
@@ -219,10 +274,10 @@ export function createGitlabFacade(config: Config, logger: Logger): GitLabFacade
           search: params.query,
           state: params.state,
           labels: params.labels?.join(","),
-          assignee_username: params.assignee,
-          author_username: params.author,
+          assigneeUsername: params.assignee ? [params.assignee] : undefined,
+          authorUsername: params.author,
           page: params.page,
-          per_page: params.per_page,
+          perPage: params.per_page,
         });
       });
 
@@ -257,7 +312,7 @@ export function createGitlabFacade(config: Config, logger: Logger): GitLabFacade
           state: params.state,
           search: params.search,
           page: params.page,
-          per_page: params.per_page,
+          perPage: params.per_page,
         });
       });
 
@@ -308,7 +363,7 @@ export function createGitlabFacade(config: Config, logger: Logger): GitLabFacade
           ref: params.ref,
           status: params.status,
           page: params.page,
-          per_page: params.per_page,
+          perPage: params.per_page,
         });
       });
 
@@ -361,6 +416,52 @@ export function createGitlabFacade(config: Config, logger: Logger): GitLabFacade
       // Some versions return Buffer/Uint8Array; normalize.
       if (trace instanceof Uint8Array) return Buffer.from(trace).toString("utf8");
       return String(trace ?? "");
+    },
+
+    async createBranch(project, branchName, ref) {
+      const effectiveRef = ref ?? (await getDefaultBranch(project));
+      const branch = await api.Branches.create(project, branchName, effectiveRef);
+      const sha = branch?.commit?.id ?? "";
+      return {
+        name: branch?.name ?? branchName,
+        web_url: branch?.web_url ?? "",
+        commit_sha: sha,
+      };
+    },
+
+    async createCommit(project, branch, message, actions, options) {
+      const commit = await api.Commits.create(project, branch, message, actions as any[], {
+        startBranch: options?.startBranch,
+      });
+      return {
+        id: commit?.id,
+        short_id: commit?.short_id,
+        title: commit?.title,
+        message: commit?.message,
+        web_url: commit?.web_url,
+        created_at: commit?.created_at,
+      };
+    },
+
+    async createMergeRequest(project, sourceBranch, targetBranch, title, options) {
+      const effectiveTarget = targetBranch ?? (await getDefaultBranch(project));
+      const mr = await api.MergeRequests.create(project, sourceBranch, effectiveTarget, title, {
+        description: options?.description,
+        labels: options?.labels,
+        removeSourceBranch: options?.removeSourceBranch,
+        assigneeId: options?.assigneeId,
+        reviewerIds: options?.reviewerIds,
+      });
+
+      return {
+        iid: mr?.iid,
+        title: mr?.title,
+        state: mr?.state,
+        web_url: mr?.web_url,
+        source_branch: mr?.source_branch,
+        target_branch: mr?.target_branch,
+        created_at: mr?.created_at,
+      };
     },
   };
 }

@@ -2,12 +2,13 @@
 
 Model Context Protocol (MCP) server for GitLab: issues, merge requests, repository files, and CI pipelines/job logs.
 
-## Features (v0.1)
+## Features
 
 - Issues: search and fetch issue details
 - Merge Requests: list and fetch MR details
 - Repo files: read a file from a ref (branch/tag/sha)
 - CI: list pipelines, inspect a pipeline, list pipeline jobs, fetch job logs
+- Write (guarded): create branch, create commit (multi-file actions), create merge request
 
 ## Install
 
@@ -21,6 +22,14 @@ npm install
 - `GITLAB_HOST` (optional): defaults to `https://gitlab.com`
 - `GITLAB_USER_AGENT` (optional): defaults to `gitlab-mcp-server/<version>`
 - `LOG_LEVEL` (optional): `error|warn|info|debug` (default: `info`)
+
+### Policy / Safety
+
+- `GITLAB_MCP_READ_ONLY` (optional): `1|true|yes` to disable all write tools (default: `false`)
+- `GITLAB_MCP_ENABLED_TOOLS` (optional): comma-separated allowlist of tool names to expose
+- `GITLAB_MCP_DISABLED_TOOLS` (optional): comma-separated denylist of tool names to hide
+- `GITLAB_MCP_WRITE_PROJECT_ALLOWLIST` (optional): comma-separated list of allowed `project` values for write tools
+- `GITLAB_MCP_HOST_ALLOWLIST` (optional): comma-separated list of allowed `GITLAB_HOST` values (fails fast if not allowed)
 
 ## Run Locally
 
@@ -81,6 +90,9 @@ Tool names exposed by this server:
 - `gitlab_get_pipeline`
 - `gitlab_list_pipeline_jobs`
 - `gitlab_get_job_log`
+- `gitlab_create_branch`
+- `gitlab_create_commit`
+- `gitlab_create_merge_request`
 
 ## Security
 

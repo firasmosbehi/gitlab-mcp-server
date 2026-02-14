@@ -12,6 +12,7 @@ const Schema = z.object({
 export const gitlabGetFileTool: ToolDef<typeof Schema, unknown> = {
   name: "gitlab_get_file",
   description: "Read a file from a GitLab repository at a given ref (branch/tag/sha).",
+  access: "read",
   inputSchema: {
     type: "object",
     additionalProperties: false,
@@ -36,4 +37,3 @@ export const gitlabGetFileTool: ToolDef<typeof Schema, unknown> = {
     };
   },
 };
-

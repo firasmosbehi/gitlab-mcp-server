@@ -11,6 +11,7 @@ const Schema = z.object({
 export const gitlabGetIssueTool: ToolDef<typeof Schema, unknown> = {
   name: "gitlab_get_issue",
   description: "Fetch a single GitLab issue by IID within a project.",
+  access: "read",
   inputSchema: {
     type: "object",
     additionalProperties: false,
@@ -32,4 +33,3 @@ export const gitlabGetIssueTool: ToolDef<typeof Schema, unknown> = {
     };
   },
 };
-

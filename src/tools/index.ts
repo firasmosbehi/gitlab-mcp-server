@@ -1,5 +1,8 @@
 import type { ToolDef } from "./types.js";
 
+import { gitlabCreateBranchTool } from "./gitlab_create_branch.js";
+import { gitlabCreateCommitTool } from "./gitlab_create_commit.js";
+import { gitlabCreateMergeRequestTool } from "./gitlab_create_merge_request.js";
 import { gitlabGetFileTool } from "./gitlab_get_file.js";
 import { gitlabGetIssueTool } from "./gitlab_get_issue.js";
 import { gitlabGetJobLogTool } from "./gitlab_get_job_log.js";
@@ -20,5 +23,9 @@ export const TOOLS: ToolDef<any, any>[] = [
   gitlabGetPipelineTool,
   gitlabListPipelineJobsTool,
   gitlabGetJobLogTool,
-];
 
+  // Write tools (guarded by read-only mode / allowlists)
+  gitlabCreateBranchTool,
+  gitlabCreateCommitTool,
+  gitlabCreateMergeRequestTool,
+];

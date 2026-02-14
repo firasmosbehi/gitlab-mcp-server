@@ -16,6 +16,7 @@ const Schema = z.object({
 export const gitlabGetJobLogTool: ToolDef<typeof Schema, unknown> = {
   name: "gitlab_get_job_log",
   description: "Fetch and return a GitLab CI job log (trace).",
+  access: "read",
   inputSchema: {
     type: "object",
     additionalProperties: false,
@@ -38,4 +39,3 @@ export const gitlabGetJobLogTool: ToolDef<typeof Schema, unknown> = {
     };
   },
 };
-

@@ -14,6 +14,7 @@ const Schema = z.object({
 export const gitlabListMergeRequestsTool: ToolDef<typeof Schema, unknown> = {
   name: "gitlab_list_merge_requests",
   description: "List merge requests for a GitLab project.",
+  access: "read",
   inputSchema: {
     type: "object",
     additionalProperties: false,
@@ -37,4 +38,3 @@ export const gitlabListMergeRequestsTool: ToolDef<typeof Schema, unknown> = {
     });
   },
 };
-

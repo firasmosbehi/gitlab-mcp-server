@@ -11,6 +11,7 @@ const Schema = z.object({
 export const gitlabGetMergeRequestTool: ToolDef<typeof Schema, unknown> = {
   name: "gitlab_get_merge_request",
   description: "Fetch a single GitLab merge request by IID within a project.",
+  access: "read",
   inputSchema: {
     type: "object",
     additionalProperties: false,
@@ -32,4 +33,3 @@ export const gitlabGetMergeRequestTool: ToolDef<typeof Schema, unknown> = {
     };
   },
 };
-
