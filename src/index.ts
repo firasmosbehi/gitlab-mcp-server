@@ -1,11 +1,25 @@
 import { Server } from "@modelcontextprotocol/sdk/server/index.js";
 import { StdioServerTransport } from "@modelcontextprotocol/sdk/server/stdio.js";
-import { CallToolRequestSchema, ListToolsRequestSchema } from "@modelcontextprotocol/sdk/types.js";
+import {
+  CallToolRequestSchema,
+  GetPromptRequestSchema,
+  ListPromptsRequestSchema,
+  ListResourcesRequestSchema,
+  ListResourceTemplatesRequestSchema,
+  ListToolsRequestSchema,
+  ReadResourceRequestSchema,
+} from "@modelcontextprotocol/sdk/types.js";
 
 import { loadConfig } from "./config.js";
 import { createGitlabFacade } from "./gitlab/client.js";
 import { toPublicError } from "./gitlab/errors.js";
 import { createLogger } from "./logger.js";
+import { listPrompts, getPrompt } from "./mcp/prompts.js";
+import {
+  listGitlabResources,
+  listGitlabResourceTemplates,
+  readGitlabResource,
+} from "./mcp/resources.js";
 import { filterTools } from "./policy.js";
 import { TOOLS } from "./tools/index.js";
 import type { ToolContext } from "./tools/types.js";
@@ -30,7 +44,7 @@ async function main() {
 
   const server = new Server(
     { name: "gitlab-mcp-server", version: VERSION },
-    { capabilities: { tools: {} } },
+    { capabilities: { tools: {}, resources: {}, prompts: {} } },
   );
 
   const allTools = TOOLS;
@@ -90,6 +104,44 @@ async function main() {
         content: [{ type: "text", text: asJsonText({ error: pub.message, status: pub.status }) }],
       };
     }
+  });
+
+  server.setRequestHandler(ListResourcesRequestSchema, async () => {
+    return { resources: listGitlabResources() };
+  });
+
+  server.setRequestHandler(ListResourceTemplatesRequestSchema, async () => {
+    return { resourceTemplates: listGitlabResourceTemplates() };
+  });
+
+  server.setRequestHandler(ReadResourceRequestSchema, async (request) => {
+    try {
+      const contents = await readGitlabResource(request.params.uri, ctx);
+      return { contents };
+    } catch (err) {
+      const pub = toPublicError(err);
+      return {
+        contents: [
+          {
+            uri: request.params.uri,
+            mimeType: "text/plain",
+            text: asJsonText({ error: pub.message, status: pub.status }),
+          },
+        ],
+      };
+    }
+  });
+
+  server.setRequestHandler(ListPromptsRequestSchema, async () => {
+    return { prompts: listPrompts() };
+  });
+
+  server.setRequestHandler(GetPromptRequestSchema, async (request) => {
+    const p = getPrompt(request.params.name, request.params.arguments);
+    return {
+      description: p.description,
+      messages: p.messages.map((m) => ({ role: m.role, content: [m.content] })),
+    };
   });
 
   const transport = new StdioServerTransport();

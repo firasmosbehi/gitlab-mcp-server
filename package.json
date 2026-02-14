@@ -1,6 +1,6 @@
 {
   "name": "gitlab-mcp-server",
-  "version": "0.1.0",
+  "version": "0.3.0",
   "description": "Model Context Protocol (MCP) server for GitLab: issues, merge requests, repository files, and CI pipelines.",
   "type": "module",
   "license": "Apache-2.0",
@@ -43,4 +43,3 @@
     "vitest": "^2.1.8"
   }
 }
-

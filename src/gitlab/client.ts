@@ -66,6 +66,39 @@ export type RepoFile = Readonly<{
   size_bytes: number;
 }>;
 
+export type RepoTreeEntry = Readonly<{
+  id: string;
+  name: string;
+  type: string;
+  path: string;
+  mode: string;
+}>;
+
+export type RepoTreeParams = Readonly<{
+  project: string;
+  ref?: string;
+  path?: string;
+  recursive?: boolean;
+  page: number;
+  per_page: number;
+}>;
+
+export type CodeSearchMatch = Readonly<{
+  path: string;
+  filename?: string;
+  ref?: string;
+  startline?: number;
+  data?: string;
+}>;
+
+export type CodeSearchParams = Readonly<{
+  project: string;
+  query: string;
+  ref?: string;
+  page: number;
+  per_page: number;
+}>;
+
 export type CreatedBranch = Readonly<{
   name: string;
   web_url: string;
@@ -132,6 +165,9 @@ export interface GitLabFacade {
   listMergeRequests: (params: ListMergeRequestsParams) => Promise<MergeRequestSummary[]>;
   getMergeRequest: (project: string, iid: number) => Promise<MergeRequestDetail>;
   getFile: (project: string, filePath: string, ref?: string) => Promise<RepoFile>;
+  listRepoTree: (params: RepoTreeParams) => Promise<RepoTreeEntry[]>;
+  searchCode: (params: CodeSearchParams) => Promise<CodeSearchMatch[]>;
+  getMergeRequestChanges: (project: string, iid: number) => Promise<any>;
   listPipelines: (params: ListPipelinesParams) => Promise<PipelineSummary[]>;
   getPipeline: (project: string, pipelineId: number) => Promise<PipelineDetail>;
   listPipelineJobs: (project: string, pipelineId: number) => Promise<PipelineJobSummary[]>;
@@ -355,6 +391,54 @@ export function createGitlabFacade(config: Config, logger: Logger): GitLabFacade
         content: buf.toString("utf8"),
         size_bytes: buf.length,
       };
+    },
+
+    async listRepoTree(params) {
+      const effectiveRef = params.ref ?? (await getDefaultBranch(params.project));
+      const entries = await withRetry<any[]>(logger, () =>
+        fetchJson<any[]>(
+          `/projects/${encodeURIComponent(params.project)}/repository/tree`,
+          {
+            ref: effectiveRef,
+            path: params.path,
+            recursive: params.recursive ? "true" : undefined,
+            page: params.page,
+            per_page: params.per_page,
+          },
+        ),
+      );
+
+      return entries.map((e) => ({
+        id: e.id,
+        name: e.name,
+        type: e.type,
+        path: e.path,
+        mode: e.mode,
+      }));
+    },
+
+    async searchCode(params) {
+      const matches = await withRetry<any[]>(logger, () =>
+        fetchJson<any[]>(`/projects/${encodeURIComponent(params.project)}/search`, {
+          scope: "blobs",
+          search: params.query,
+          ref: params.ref,
+          page: params.page,
+          per_page: params.per_page,
+        }),
+      );
+
+      return matches.map((m) => ({
+        path: m.path ?? m.filename ?? "",
+        filename: m.filename,
+        ref: m.ref,
+        startline: typeof m.startline === "number" ? m.startline : undefined,
+        data: m.data,
+      }));
+    },
+
+    async getMergeRequestChanges(project, iid) {
+      return withRetry<any>(logger, () => api.MergeRequests.showChanges(project, iid));
     },
 
     async listPipelines(params) {
