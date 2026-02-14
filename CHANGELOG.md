@@ -1,5 +1,12 @@
 # Changelog
 
+## 1.0.0
+
+- Transport: add optional MCP Streamable HTTP server mode (in addition to stdio), with basic bearer auth support.
+- Auth: add optional GitLab OAuth token support (in addition to PATs), including helper CLI for login/refresh and token-file based refresh.
+- Distribution: npm packaging hardening, release checklist, and GitHub Actions workflows for npm + GHCR publishing.
+- Security: Dependabot, dependency review, and CodeQL scanning.
+
 ## 0.4.0
 
 - CI power tools: retry/cancel/play job; retry/cancel pipeline.

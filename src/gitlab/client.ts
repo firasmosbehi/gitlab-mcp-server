@@ -10,6 +10,7 @@ import { pipeline as streamPipeline } from "node:stream/promises";
 import type { Config } from "../config.js";
 import type { Logger } from "../logger.js";
 import { getHttpStatus } from "./errors.js";
+import { createGitLabAuthProvider } from "./oauth.js";
 
 export type IssueSummary = Readonly<{
   iid: number;
@@ -342,9 +343,25 @@ class ByteLimitTransform extends Transform {
 }
 
 export function createGitlabFacade(config: Config, logger: Logger): GitLabFacade {
+  const auth =
+    config.gitlabAuthMode === "oauth"
+      ? createGitLabAuthProvider(
+          {
+            kind: "oauth",
+            host: config.gitlabHost,
+            accessToken: config.gitlabOauthAccessToken,
+            tokenFile: config.gitlabOauthTokenFile,
+            clientId: config.gitlabOauthClientId,
+            clientSecret: config.gitlabOauthClientSecret,
+            redirectUri: config.gitlabOauthRedirectUri,
+          },
+          logger,
+        )
+      : createGitLabAuthProvider({ kind: "pat", token: config.gitlabToken! }, logger);
+
   const api: AnyGitlab = new Gitlab({
     host: config.gitlabHost,
-    token: config.gitlabToken,
+    ...(auth.kind === "oauth" ? { oauthToken: auth.getToken } : { token: auth.getToken }),
   });
 
   async function fetchJson<T>(
@@ -359,10 +376,11 @@ export function createGitlabFacade(config: Config, logger: Logger): GitLabFacade
       url.searchParams.set(k, String(v));
     }
 
+    const authHeaders = await auth.getAuthHeaders();
     const res = await fetch(url, {
       ...init,
       headers: {
-        "PRIVATE-TOKEN": config.gitlabToken,
+        ...authHeaders,
         "User-Agent": config.gitlabUserAgent,
         Accept: "application/json",
         ...(init?.headers ?? {}),
@@ -390,10 +408,11 @@ export function createGitlabFacade(config: Config, logger: Logger): GitLabFacade
       url.searchParams.set(k, String(v));
     }
 
+    const authHeaders = await auth.getAuthHeaders();
     const res = await fetch(url, {
       ...init,
       headers: {
-        "PRIVATE-TOKEN": config.gitlabToken,
+        ...authHeaders,
         "User-Agent": config.gitlabUserAgent,
         ...(init.headers ?? {}),
       },
