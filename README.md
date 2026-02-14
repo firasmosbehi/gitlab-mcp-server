@@ -9,7 +9,9 @@ Model Context Protocol (MCP) server for GitLab: issues, merge requests, reposito
 - Repo files: read a file from a ref (branch/tag/sha)
 - Repo navigation: list repo tree, search code
 - MR context: bounded diff summaries via MR changes
-- CI: list pipelines, inspect a pipeline, list pipeline jobs, fetch job logs
+- CI: list pipelines, inspect a pipeline, list pipeline jobs, fetch job logs (plus tail/search)
+- CI actions (guarded): retry/cancel/play job; retry/cancel pipeline
+- Artifacts: fetch artifacts metadata and download artifacts archive (size-limited)
 - Write (guarded): create branch, create commit (multi-file actions), create merge request
 - MCP: resources (`gitlab://...`) and prompts
 
@@ -95,10 +97,19 @@ Tool names exposed by this server:
 - `gitlab_get_pipeline`
 - `gitlab_list_pipeline_jobs`
 - `gitlab_get_job_log`
+- `gitlab_get_job_log_tail`
+- `gitlab_search_job_log`
+- `gitlab_get_job_artifacts`
+- `gitlab_download_job_artifacts`
 - `gitlab_get_merge_request_changes`
 - `gitlab_create_branch`
 - `gitlab_create_commit`
 - `gitlab_create_merge_request`
+- `gitlab_retry_job`
+- `gitlab_cancel_job`
+- `gitlab_play_job`
+- `gitlab_retry_pipeline`
+- `gitlab_cancel_pipeline`
 
 ## MCP Resources and Prompts
 

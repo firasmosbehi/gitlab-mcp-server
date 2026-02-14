@@ -1,5 +1,12 @@
 import { Gitlab } from "@gitbeaker/rest";
 
+import { createWriteStream } from "node:fs";
+import { mkdir, rm } from "node:fs/promises";
+import { tmpdir } from "node:os";
+import path from "node:path";
+import { Readable, Transform } from "node:stream";
+import { pipeline as streamPipeline } from "node:stream/promises";
+
 import type { Config } from "../config.js";
 import type { Logger } from "../logger.js";
 import { getHttpStatus } from "./errors.js";
@@ -57,6 +64,29 @@ export type PipelineJobSummary = Readonly<{
   web_url: string;
   started_at: string | null;
   finished_at: string | null;
+}>;
+
+export type JobLogTail = Readonly<{
+  text: string;
+  is_partial: boolean;
+  bytes_total?: number;
+  bytes_start?: number;
+  bytes_end?: number;
+}>;
+
+export type JobArtifactsMetadata = Readonly<{
+  job_id: number;
+  filename?: string;
+  size_bytes?: number;
+  format?: string;
+}>;
+
+export type DownloadedJobArtifacts = Readonly<{
+  job_id: number;
+  filename: string;
+  size_bytes?: number;
+  downloaded_bytes: number;
+  local_path: string;
 }>;
 
 export type RepoFile = Readonly<{
@@ -172,6 +202,18 @@ export interface GitLabFacade {
   getPipeline: (project: string, pipelineId: number) => Promise<PipelineDetail>;
   listPipelineJobs: (project: string, pipelineId: number) => Promise<PipelineJobSummary[]>;
   getJobLog: (project: string, jobId: number) => Promise<string>;
+  getJobLogTail: (project: string, jobId: number, maxBytes: number) => Promise<JobLogTail>;
+  retryJob: (project: string, jobId: number) => Promise<PipelineJobSummary>;
+  cancelJob: (project: string, jobId: number) => Promise<PipelineJobSummary>;
+  playJob: (project: string, jobId: number) => Promise<PipelineJobSummary>;
+  retryPipeline: (project: string, pipelineId: number) => Promise<PipelineDetail>;
+  cancelPipeline: (project: string, pipelineId: number) => Promise<PipelineDetail>;
+  getJobArtifactsMetadata: (project: string, jobId: number) => Promise<JobArtifactsMetadata>;
+  downloadJobArtifacts: (
+    project: string,
+    jobId: number,
+    options: { maxBytes: number },
+  ) => Promise<DownloadedJobArtifacts>;
 
   createBranch: (project: string, branchName: string, ref?: string) => Promise<CreatedBranch>;
   createCommit: (
@@ -251,6 +293,54 @@ function decodeRepoFile(content: string, encoding: string): Buffer {
   return Buffer.from(content, "utf8");
 }
 
+function parseContentRange(
+  value: string | null,
+): Readonly<{ start: number; end: number; total?: number }> | undefined {
+  if (!value) return undefined;
+  const m = value.match(/^bytes (\d+)-(\d+)\/(\d+|\*)$/);
+  if (!m) return undefined;
+  const start = Number(m[1]);
+  const end = Number(m[2]);
+  const total = m[3] === "*" ? undefined : Number(m[3]);
+  if (!Number.isFinite(start) || !Number.isFinite(end)) return undefined;
+  if (total !== undefined && !Number.isFinite(total)) return undefined;
+  return { start, end, total };
+}
+
+function sanitizePathSegment(value: string): string {
+  // Normalize user-provided project paths like "group/project" into safe filesystem segments.
+  // Keep it stable and cross-platform friendly.
+  const s = value.trim().slice(0, 200);
+  const normalized = s.replace(/[^a-zA-Z0-9._-]+/g, "_");
+  return normalized || "project";
+}
+
+class ByteLimitTransform extends Transform {
+  private seen = 0;
+  constructor(private readonly maxBytes: number) {
+    super();
+  }
+
+  public getBytesSeen(): number {
+    return this.seen;
+  }
+
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
+  override _transform(
+    chunk: any,
+    _encoding: BufferEncoding,
+    callback: (error?: Error | null, data?: any) => void,
+  ) {
+    const len = typeof chunk?.length === "number" ? chunk.length : 0;
+    this.seen += len;
+    if (this.seen > this.maxBytes) {
+      callback(new Error(`Response exceeds limit of ${this.maxBytes} bytes.`));
+      return;
+    }
+    callback(null, chunk);
+  }
+}
+
 export function createGitlabFacade(config: Config, logger: Logger): GitLabFacade {
   const api: AnyGitlab = new Gitlab({
     host: config.gitlabHost,
@@ -260,6 +350,7 @@ export function createGitlabFacade(config: Config, logger: Logger): GitLabFacade
   async function fetchJson<T>(
     path: string,
     query?: Record<string, string | number | undefined>,
+    init?: RequestInit,
   ): Promise<T> {
     const base = `${config.gitlabHost}/api/v4`;
     const url = new URL(`${base}${path}`);
@@ -269,10 +360,12 @@ export function createGitlabFacade(config: Config, logger: Logger): GitLabFacade
     }
 
     const res = await fetch(url, {
+      ...init,
       headers: {
         "PRIVATE-TOKEN": config.gitlabToken,
         "User-Agent": config.gitlabUserAgent,
         Accept: "application/json",
+        ...(init?.headers ?? {}),
       },
     });
 
@@ -283,6 +376,154 @@ export function createGitlabFacade(config: Config, logger: Logger): GitLabFacade
     }
 
     return (await res.json()) as T;
+  }
+
+  async function fetchOk(
+    path: string,
+    query: Record<string, string | number | undefined> | undefined,
+    init: RequestInit & { method: string },
+  ): Promise<Response> {
+    const base = `${config.gitlabHost}/api/v4`;
+    const url = new URL(`${base}${path}`);
+    for (const [k, v] of Object.entries(query ?? {})) {
+      if (v === undefined) continue;
+      url.searchParams.set(k, String(v));
+    }
+
+    const res = await fetch(url, {
+      ...init,
+      headers: {
+        "PRIVATE-TOKEN": config.gitlabToken,
+        "User-Agent": config.gitlabUserAgent,
+        ...(init.headers ?? {}),
+      },
+    });
+
+    if (!res.ok) {
+      const text = await res.text().catch(() => "");
+      const snippet = text.length > 500 ? `${text.slice(0, 500)}...` : text;
+      throw new GitlabFetchError(res.status, `GitLab API error (${res.status}): ${snippet}`);
+    }
+
+    return res;
+  }
+
+  async function fetchJobLogTail(
+    project: string,
+    jobId: number,
+    maxBytes: number,
+  ): Promise<JobLogTail> {
+    // Use Range to avoid pulling the full trace when supported.
+    const res = await withRetry(logger, () =>
+      fetchOk(
+        `/projects/${encodeURIComponent(project)}/jobs/${jobId}/trace`,
+        undefined,
+        {
+          method: "GET",
+          headers: {
+            Accept: "text/plain",
+            Range: `bytes=-${maxBytes}`,
+          },
+        },
+      ),
+    );
+
+    const contentRange = parseContentRange(res.headers.get("content-range"));
+    const bytesTotal =
+      contentRange?.total ??
+      (() => {
+        const raw = res.headers.get("content-length");
+        if (!raw) return undefined;
+        const n = Number(raw);
+        return Number.isFinite(n) ? n : undefined;
+      })();
+
+    // Read response as bytes and keep only the last maxBytes in memory as a ring buffer.
+    const body = res.body;
+    if (!body) {
+      return { text: "", is_partial: false, bytes_total: bytesTotal };
+    }
+
+    let totalSeen = 0;
+    let tail = Buffer.alloc(0);
+    const reader = Readable.fromWeb(body as any);
+    for await (const chunk of reader) {
+      const buf = Buffer.isBuffer(chunk) ? chunk : Buffer.from(chunk);
+      totalSeen += buf.length;
+      if (buf.length >= maxBytes) {
+        tail = buf.subarray(buf.length - maxBytes);
+        continue;
+      }
+      if (tail.length + buf.length <= maxBytes) {
+        tail = Buffer.concat([tail, buf], tail.length + buf.length);
+        continue;
+      }
+      const combined = Buffer.concat([tail, buf], tail.length + buf.length);
+      tail = combined.subarray(combined.length - maxBytes);
+    }
+
+    const isPartial =
+      res.status === 206 ||
+      (contentRange ? contentRange.start > 0 : totalSeen > maxBytes);
+
+    return {
+      text: tail.toString("utf8"),
+      is_partial: isPartial,
+      bytes_total: bytesTotal ?? (totalSeen > 0 ? totalSeen : undefined),
+      bytes_start: contentRange?.start,
+      bytes_end: contentRange?.end,
+    };
+  }
+
+  async function downloadToFileWithLimit(
+    res: Response,
+    filePath: string,
+    maxBytes: number,
+  ): Promise<number> {
+    const body = res.body;
+    if (!body) throw new Error("No response body.");
+
+    await mkdir(path.dirname(filePath), { recursive: true });
+
+    const contentLengthRaw = res.headers.get("content-length");
+    if (contentLengthRaw) {
+      const n = Number(contentLengthRaw);
+      if (Number.isFinite(n) && n > maxBytes) {
+        throw new Error(`Artifact too large (${n} bytes). Max allowed is ${maxBytes} bytes.`);
+      }
+    }
+
+    const limiter = new ByteLimitTransform(maxBytes);
+    const out = createWriteStream(filePath, { flags: "w" });
+
+    try {
+      await streamPipeline(Readable.fromWeb(body as any), limiter, out);
+      return limiter.getBytesSeen();
+    } catch (err) {
+      // Best-effort cleanup of partially written files.
+      await rm(filePath, { force: true }).catch(() => undefined);
+      throw err;
+    }
+  }
+
+  async function getJobArtifactsMetadataInternal(
+    project: string,
+    jobId: number,
+  ): Promise<JobArtifactsMetadata> {
+    const job = await withRetry<any>(logger, () =>
+      fetchJson<any>(`/projects/${encodeURIComponent(project)}/jobs/${jobId}`),
+    );
+    const file = job?.artifacts_file ?? undefined;
+    const filename = typeof file?.filename === "string" ? file.filename : undefined;
+    const sizeBytes = typeof file?.size === "number" ? file.size : undefined;
+    const format = typeof file?.format === "string" ? file.format : undefined;
+
+    return {
+      job_id: jobId,
+      filename,
+      size_bytes: sizeBytes,
+      format,
+    };
   }
 
   const defaultBranchCache = new Map<string, string>();
@@ -503,6 +744,141 @@ export function createGitlabFacade(config: Config, logger: Logger): GitLabFacade
       // Some versions return Buffer/Uint8Array; normalize.
       if (trace instanceof Uint8Array) return Buffer.from(trace).toString("utf8");
       return String(trace ?? "");
+    },
+
+    async getJobLogTail(project, jobId, maxBytes) {
+      return fetchJobLogTail(project, jobId, maxBytes);
+    },
+
+    async retryJob(project, jobId) {
+      const j = await withRetry<any>(logger, () =>
+        fetchJson<any>(`/projects/${encodeURIComponent(project)}/jobs/${jobId}/retry`, undefined, {
+          method: "POST",
+        }),
+      );
+      return {
+        id: j.id,
+        name: j.name,
+        stage: j.stage,
+        status: j.status,
+        web_url: j.web_url,
+        started_at: j.started_at ?? null,
+        finished_at: j.finished_at ?? null,
+      };
+    },
+
+    async cancelJob(project, jobId) {
+      const j = await withRetry<any>(logger, () =>
+        fetchJson<any>(`/projects/${encodeURIComponent(project)}/jobs/${jobId}/cancel`, undefined, {
+          method: "POST",
+        }),
+      );
+      return {
+        id: j.id,
+        name: j.name,
+        stage: j.stage,
+        status: j.status,
+        web_url: j.web_url,
+        started_at: j.started_at ?? null,
+        finished_at: j.finished_at ?? null,
+      };
+    },
+
+    async playJob(project, jobId) {
+      const j = await withRetry<any>(logger, () =>
+        fetchJson<any>(`/projects/${encodeURIComponent(project)}/jobs/${jobId}/play`, undefined, {
+          method: "POST",
+        }),
+      );
+      return {
+        id: j.id,
+        name: j.name,
+        stage: j.stage,
+        status: j.status,
+        web_url: j.web_url,
+        started_at: j.started_at ?? null,
+        finished_at: j.finished_at ?? null,
+      };
+    },
+
+    async retryPipeline(project, pipelineId) {
+      const p = await withRetry<any>(logger, () =>
+        fetchJson<any>(
+          `/projects/${encodeURIComponent(project)}/pipelines/${pipelineId}/retry`,
+          undefined,
+          { method: "POST" },
+        ),
+      );
+      return {
+        id: p.id,
+        status: p.status,
+        ref: p.ref,
+        sha: p.sha,
+        web_url: p.web_url,
+        updated_at: p.updated_at,
+        created_at: p.created_at,
+      };
+    },
+
+    async cancelPipeline(project, pipelineId) {
+      const p = await withRetry<any>(logger, () =>
+        fetchJson<any>(
+          `/projects/${encodeURIComponent(project)}/pipelines/${pipelineId}/cancel`,
+          undefined,
+          { method: "POST" },
+        ),
+      );
+      return {
+        id: p.id,
+        status: p.status,
+        ref: p.ref,
+        sha: p.sha,
+        web_url: p.web_url,
+        updated_at: p.updated_at,
+        created_at: p.created_at,
+      };
+    },
+
+    async getJobArtifactsMetadata(project, jobId) {
+      return getJobArtifactsMetadataInternal(project, jobId);
+    },
+
+    async downloadJobArtifacts(project, jobId, options) {
+      const meta = await getJobArtifactsMetadataInternal(project, jobId);
+      if (!meta.filename) {
+        throw new Error("No artifacts found for this job (artifacts_file.filename is missing).");
+      }
+      if (meta.size_bytes !== undefined && meta.size_bytes > options.maxBytes) {
+        throw new Error(
+          `Artifacts too large (${meta.size_bytes} bytes). Max allowed is ${options.maxBytes} bytes.`,
+        );
+      }
+
+      const projectDir = sanitizePathSegment(project);
+      const filenameSafe = sanitizePathSegment(meta.filename);
+      const targetDir = path.join(tmpdir(), "gitlab-mcp-server", "artifacts", projectDir);
+      const targetPath = path.join(targetDir, `${jobId}-${filenameSafe}`);
+
+      const res = await withRetry(logger, () =>
+        fetchOk(
+          `/projects/${encodeURIComponent(project)}/jobs/${jobId}/artifacts`,
+          undefined,
+          {
+            method: "GET",
+            headers: { Accept: "application/octet-stream" },
+          },
+        ),
+      );
+
+      const downloaded = await downloadToFileWithLimit(res, targetPath, options.maxBytes);
+
+      return {
+        job_id: jobId,
+        filename: meta.filename,
+        size_bytes: meta.size_bytes,
+        downloaded_bytes: downloaded,
+        local_path: targetPath,
+      };
     },
 
     async createBranch(project, branchName, ref) {

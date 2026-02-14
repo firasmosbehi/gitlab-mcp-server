@@ -19,3 +19,11 @@ export const DEFAULT_MAX_JOB_LOG_CHARS = 50_000;
 export const MAX_JOB_LOG_CHARS_CAP = 200_000;
 export const DEFAULT_MAX_FILE_CHARS = 200_000;
 
+// CI log ergonomics (tail/search tools)
+export const DEFAULT_JOB_LOG_TAIL_LINES = 200;
+export const DEFAULT_JOB_LOG_TAIL_MAX_BYTES = 200_000;
+export const MAX_JOB_LOG_TAIL_MAX_BYTES_CAP = 2_000_000;
+
+// Artifacts
+export const DEFAULT_MAX_ARTIFACT_BYTES = 10_000_000; // 10 MB
+export const MAX_ARTIFACT_BYTES_CAP = 50_000_000; // 50 MB

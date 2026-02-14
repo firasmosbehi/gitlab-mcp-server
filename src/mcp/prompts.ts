@@ -88,13 +88,15 @@ const PROMPTS: PromptDef[] = [
         `Debug GitLab CI job ${jobId} in project ${project}.`,
         "",
         "Use tools:",
-        `- gitlab_get_job_log { project: \"${project}\", job_id: ${jobId} }`,
+        `- gitlab_get_job_log_tail { project: \"${project}\", job_id: ${jobId} }`,
+        `- gitlab_search_job_log (optional) to find errors quickly`,
+        `- gitlab_get_job_log (optional) for a larger slice (bounded by max_chars)`,
         "",
         "Deliverables:",
         "1) Identify the failing step and error signature.",
         "2) Likely root cause and where in code/config to look.",
         "3) Concrete fix suggestion and tests/validation steps.",
-        "4) If logs are truncated, request narrower output (or add log tail/search in a follow-up).",
+        "4) If output is truncated/partial, increase max_bytes or narrow search.",
       ].join("\n");
     },
   },
@@ -127,4 +129,3 @@ export function getPrompt(
     messages: [{ role: "user", content: { type: "text", text } }],
   };
 }
-

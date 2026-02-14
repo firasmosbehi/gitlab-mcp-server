@@ -1,5 +1,11 @@
 # Changelog
 
+## 0.4.0
+
+- CI power tools: retry/cancel/play job; retry/cancel pipeline.
+- Artifacts: fetch artifacts metadata and download artifacts archive with size limits.
+- Job log ergonomics: fetch log tail and search within bounded log tails.
+
 ## 0.3.0
 
 - Repo navigation: list repository tree, search code.
