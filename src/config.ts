@@ -49,6 +49,7 @@ const EnvSchema = z.object({
   // GitLab auth
   GITLAB_AUTH_MODE: AuthModeSchema.default("pat"),
   GITLAB_TOKEN: z.string().min(1).optional(),
+  GITLAB_TRIGGER_TOKEN: z.string().min(1).optional(),
   GITLAB_OAUTH_ACCESS_TOKEN: z.string().min(1).optional(),
   GITLAB_OAUTH_TOKEN_FILE: z.string().min(1).optional(),
   GITLAB_OAUTH_CLIENT_ID: z.string().min(1).optional(),
@@ -92,6 +93,7 @@ export type Config = Readonly<{
 
   gitlabAuthMode: AuthMode;
   gitlabToken?: string;
+  gitlabTriggerToken?: string;
   gitlabOauthAccessToken?: string;
   gitlabOauthTokenFile?: string;
   gitlabOauthClientId?: string;
@@ -152,6 +154,7 @@ export function loadConfig(env: NodeJS.ProcessEnv = process.env): Config {
 
     gitlabAuthMode: parsed.GITLAB_AUTH_MODE,
     gitlabToken: parsed.GITLAB_TOKEN,
+    gitlabTriggerToken: parsed.GITLAB_TRIGGER_TOKEN,
     gitlabOauthAccessToken: parsed.GITLAB_OAUTH_ACCESS_TOKEN,
     gitlabOauthTokenFile: parsed.GITLAB_OAUTH_TOKEN_FILE,
     gitlabOauthClientId: parsed.GITLAB_OAUTH_CLIENT_ID,

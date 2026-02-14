@@ -26,6 +26,7 @@ import { gitlabListIssueNotesTool } from "./gitlab_list_issue_notes.js";
 import { gitlabListMergeRequestsTool } from "./gitlab_list_merge_requests.js";
 import { gitlabListMergeRequestDiscussionsTool } from "./gitlab_list_merge_request_discussions.js";
 import { gitlabListMergeRequestNotesTool } from "./gitlab_list_merge_request_notes.js";
+import { gitlabListPipelineVariablesTool } from "./gitlab_list_pipeline_variables.js";
 import { gitlabListPipelineJobsTool } from "./gitlab_list_pipeline_jobs.js";
 import { gitlabListPipelinesTool } from "./gitlab_list_pipelines.js";
 import { gitlabListBranchesTool } from "./gitlab_list_branches.js";
@@ -44,6 +45,8 @@ import { gitlabUpdateIssueTool } from "./gitlab_update_issue.js";
 import { gitlabUpdateMergeRequestDiscussionNoteTool } from "./gitlab_update_merge_request_discussion_note.js";
 import { gitlabUpdateMergeRequestTool } from "./gitlab_update_merge_request.js";
 import { gitlabUnapproveMergeRequestTool } from "./gitlab_unapprove_merge_request.js";
+import { gitlabCreatePipelineTool } from "./gitlab_create_pipeline.js";
+import { gitlabTriggerPipelineTool } from "./gitlab_trigger_pipeline.js";
 
 export const TOOLS: ToolDef<any, any>[] = [
   gitlabGetCurrentUserTool,
@@ -65,6 +68,7 @@ export const TOOLS: ToolDef<any, any>[] = [
   gitlabSearchCodeTool,
   gitlabListPipelinesTool,
   gitlabGetPipelineTool,
+  gitlabListPipelineVariablesTool,
   gitlabListPipelineJobsTool,
   gitlabGetJobLogTool,
   gitlabGetJobLogTailTool,
@@ -90,6 +94,8 @@ export const TOOLS: ToolDef<any, any>[] = [
   gitlabCreateMergeRequestTool,
 
   // CI write tools (guarded by read-only mode / allowlists)
+  gitlabCreatePipelineTool,
+  gitlabTriggerPipelineTool,
   gitlabRetryJobTool,
   gitlabCancelJobTool,
   gitlabPlayJobTool,

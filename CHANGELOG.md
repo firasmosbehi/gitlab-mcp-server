@@ -1,5 +1,9 @@
 # Changelog
 
+## 1.5.0
+
+- CI: create pipelines, trigger pipelines (trigger token), and list pipeline variables.
+
 ## 1.4.0
 
 - Merge requests: update metadata (title/description/labels/assignees/reviewers/target branch), close/reopen, and approve/unapprove.

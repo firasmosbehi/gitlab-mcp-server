@@ -13,6 +13,11 @@ describe("loadConfig", () => {
     expect(cfg.gitlabToken).toBe("x");
   });
 
+  it("accepts optional trigger token", () => {
+    const cfg = loadConfig({ GITLAB_TOKEN: "x", GITLAB_TRIGGER_TOKEN: "t" } as any);
+    expect(cfg.gitlabTriggerToken).toBe("t");
+  });
+
   it("requires access token or token file in oauth mode", () => {
     expect(() =>
       loadConfig({ GITLAB_AUTH_MODE: "oauth", GITLAB_HOST: "https://gitlab.com" } as any),
@@ -55,4 +60,3 @@ describe("loadConfig", () => {
     expect(cfg.httpMaxSessions).toBe(10);
   });
 });
-

@@ -10,8 +10,8 @@ Model Context Protocol (MCP) server for GitLab: issues, merge requests, reposito
 - Repo files: read a file from a ref (branch/tag/sha)
 - Repo navigation: list repo tree, search code
 - MR context: bounded diff summaries via MR changes
-- CI: list pipelines, inspect a pipeline, list pipeline jobs, fetch job logs (plus tail/search)
-- CI actions (guarded): retry/cancel/play job; retry/cancel pipeline
+- CI: list pipelines, inspect a pipeline, list pipeline variables, list pipeline jobs, fetch job logs (plus tail/search)
+- CI actions (guarded): create/trigger pipeline; retry/cancel/play job; retry/cancel pipeline
 - Artifacts: fetch artifacts metadata and download artifacts archive (size-limited)
 - Write (guarded): create branch, create commit (multi-file actions), create merge request
 - MCP: resources (`gitlab://...`) and prompts
@@ -37,6 +37,7 @@ npm run build
 
 - `GITLAB_AUTH_MODE` (optional): `pat|oauth` (default: `pat`)
 - `GITLAB_TOKEN` (required for `pat`): GitLab Personal Access Token
+- `GITLAB_TRIGGER_TOKEN` (optional): GitLab pipeline trigger token (for `gitlab_trigger_pipeline`)
 - `GITLAB_OAUTH_ACCESS_TOKEN` (optional for `oauth`): GitLab OAuth access token
 - `GITLAB_OAUTH_TOKEN_FILE` (optional for `oauth`): Path to an OAuth token JSON file (preferred)
 - `GITLAB_OAUTH_CLIENT_ID` / `GITLAB_OAUTH_CLIENT_SECRET` / `GITLAB_OAUTH_REDIRECT_URI` (optional): used for token refresh and `gitlab-mcp-server auth ...`
@@ -160,6 +161,7 @@ Tool names exposed by this server:
 - `gitlab_search_code`
 - `gitlab_list_pipelines`
 - `gitlab_get_pipeline`
+- `gitlab_list_pipeline_variables`
 - `gitlab_list_pipeline_jobs`
 - `gitlab_get_job_log`
 - `gitlab_get_job_log_tail`
@@ -181,6 +183,8 @@ Tool names exposed by this server:
 - `gitlab_create_branch`
 - `gitlab_create_commit`
 - `gitlab_create_merge_request`
+- `gitlab_create_pipeline`
+- `gitlab_trigger_pipeline`
 - `gitlab_retry_job`
 - `gitlab_cancel_job`
 - `gitlab_play_job`

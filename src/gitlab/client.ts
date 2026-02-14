@@ -72,6 +72,11 @@ export type PipelineDetail = PipelineSummary &
     created_at: string;
   }>;
 
+export type PipelineVariable = Readonly<{
+  key: string;
+  value: string;
+}>;
+
 export type PipelineJobSummary = Readonly<{
   id: number;
   name: string;
@@ -416,6 +421,17 @@ export interface GitLabFacade {
   getMergeRequestChanges: (project: string, iid: number) => Promise<any>;
   listPipelines: (params: ListPipelinesParams) => Promise<PipelineSummary[]>;
   getPipeline: (project: string, pipelineId: number) => Promise<PipelineDetail>;
+  listPipelineVariables: (project: string, pipelineId: number) => Promise<PipelineVariable[]>;
+  createPipeline: (
+    project: string,
+    ref: string,
+    options?: { variables?: PipelineVariable[] },
+  ) => Promise<PipelineDetail>;
+  triggerPipeline: (
+    project: string,
+    ref: string,
+    options?: { token?: string; variables?: PipelineVariable[] },
+  ) => Promise<PipelineDetail>;
   listPipelineJobs: (project: string, pipelineId: number) => Promise<PipelineJobSummary[]>;
   getJobLog: (project: string, jobId: number) => Promise<string>;
   getJobLogTail: (project: string, jobId: number, maxBytes: number) => Promise<JobLogTail>;
@@ -1491,6 +1507,76 @@ export function createGitlabFacade(config: Config, logger: Logger): GitLabFacade
         web_url: p.web_url,
         updated_at: p.updated_at,
         created_at: p.created_at,
+      };
+    },
+
+    async listPipelineVariables(project, pipelineId) {
+      const vars = await withRetry<any[]>(logger, () => api.Pipelines.allVariables(project, pipelineId));
+      return (vars as any[]).map((v) => ({
+        key: typeof v?.key === "string" ? v.key : "",
+        value: typeof v?.value === "string" ? v.value : String(v?.value ?? ""),
+      }));
+    },
+
+    async createPipeline(project, ref, options) {
+      const variables = options?.variables?.map((v) => ({ key: v.key, value: v.value })) ?? undefined;
+
+      const p = await withRetry<any>(logger, () => api.Pipelines.create(project, ref, { variables }));
+
+      const id = typeof p?.id === "number" ? p.id : Number(p?.id);
+      const createdAt = typeof p?.created_at === "string" ? p.created_at : "";
+      const updatedAt =
+        typeof p?.updated_at === "string"
+          ? p.updated_at
+          : typeof p?.updatedAt === "string"
+            ? p.updatedAt
+            : createdAt;
+
+      return {
+        id: Number.isFinite(id) ? id : 0,
+        status: p?.status ?? "",
+        ref: p?.ref ?? ref,
+        sha: p?.sha ?? "",
+        web_url: p?.web_url ?? "",
+        updated_at: updatedAt,
+        created_at: createdAt,
+      };
+    },
+
+    async triggerPipeline(project, ref, options) {
+      const token = options?.token ?? config.gitlabTriggerToken;
+      if (!token) {
+        throw new Error(
+          "No trigger token configured. Set GITLAB_TRIGGER_TOKEN or pass 'token' to gitlab_trigger_pipeline.",
+        );
+      }
+
+      const variables =
+        options?.variables && options.variables.length
+          ? Object.fromEntries(options.variables.map((v) => [v.key, v.value]))
+          : undefined;
+
+      const p = await withRetry<any>(logger, () =>
+        api.PipelineTriggerTokens.trigger(project, ref, token, { variables }),
+      );
+
+      const id = typeof p?.id === "number" ? p.id : Number(p?.id);
+      const createdAt = typeof p?.created_at === "string" ? p.created_at : "";
+      const updatedAt =
+        typeof p?.updated_at === "string"
+          ? p.updated_at
+          : typeof p?.updatedAt === "string"
+            ? p.updatedAt
+            : createdAt;
+
+      return {
+        id: Number.isFinite(id) ? id : 0,
+        status: p?.status ?? "",
+        ref: p?.ref ?? ref,
+        sha: p?.sha ?? "",
+        web_url: p?.web_url ?? "",
+        updated_at: updatedAt,
+        created_at: createdAt,
       };
     },
 
