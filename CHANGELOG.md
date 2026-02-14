@@ -1,5 +1,9 @@
 # Changelog
 
+## 1.0.1
+
+- Packaging: publish to npm as `@firasmosbehi/gitlab-mcp-server` (scoped) to avoid name conflicts.
+
 ## 1.0.0
 
 - Transport: add optional MCP Streamable HTTP server mode (in addition to stdio), with basic bearer auth support.
