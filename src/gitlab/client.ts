@@ -314,6 +314,7 @@ export function createGitlabFacade(config: Config, logger: Logger): GitLabFacade
           authorUsername: params.author,
           page: params.page,
           perPage: params.per_page,
+          maxPages: 1,
         });
       });
 
@@ -349,6 +350,7 @@ export function createGitlabFacade(config: Config, logger: Logger): GitLabFacade
           search: params.search,
           page: params.page,
           perPage: params.per_page,
+          maxPages: 1,
         });
       });
 
@@ -448,6 +450,7 @@ export function createGitlabFacade(config: Config, logger: Logger): GitLabFacade
           status: params.status,
           page: params.page,
           perPage: params.per_page,
+          maxPages: 1,
         });
       });
 
