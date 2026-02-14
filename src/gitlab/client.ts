@@ -43,6 +43,12 @@ export type MergeRequestDetail = MergeRequestSummary &
     created_at: string;
   }>;
 
+export type MergeRequestMergeResult = MergeRequestDetail &
+  Readonly<{
+    merged_at?: string;
+    merge_commit_sha?: string;
+  }>;
+
 export type PipelineSummary = Readonly<{
   id: number;
   status: string;
@@ -120,6 +126,30 @@ export type ProjectLabelSummary = Readonly<{
   name: string;
   description?: string;
   color?: string;
+}>;
+
+export type MergeRequestDiscussionPosition = Readonly<{
+  position_type?: string;
+  base_sha?: string;
+  start_sha?: string;
+  head_sha?: string;
+  new_path?: string;
+  new_line?: number;
+  old_path?: string;
+  old_line?: number;
+}>;
+
+export type MergeRequestDiscussionNote = NoteSummary &
+  Readonly<{
+    resolved?: boolean;
+    resolvable?: boolean;
+    position?: MergeRequestDiscussionPosition;
+  }>;
+
+export type MergeRequestDiscussion = Readonly<{
+  id: string;
+  individual_note?: boolean;
+  notes: MergeRequestDiscussionNote[];
 }>;
 
 export type JobArtifactsMetadata = Readonly<{
@@ -271,6 +301,51 @@ export interface GitLabFacade {
     options: { page: number; per_page: number },
   ) => Promise<NoteSummary[]>;
   addMergeRequestNote: (project: string, iid: number, body: string) => Promise<NoteSummary>;
+  listMergeRequestDiscussions: (
+    project: string,
+    iid: number,
+    options: { page: number; per_page: number },
+  ) => Promise<MergeRequestDiscussion[]>;
+  createMergeRequestDiscussion: (
+    project: string,
+    iid: number,
+    body: string,
+    options?: {
+      position?: Readonly<{
+        base_sha: string;
+        start_sha: string;
+        head_sha: string;
+        new_path?: string;
+        new_line?: number;
+        old_path?: string;
+        old_line?: number;
+      }>;
+    },
+  ) => Promise<MergeRequestDiscussion>;
+  addMergeRequestDiscussionNote: (
+    project: string,
+    iid: number,
+    discussionId: string,
+    body: string,
+  ) => Promise<MergeRequestDiscussionNote>;
+  updateMergeRequestDiscussionNote: (
+    project: string,
+    iid: number,
+    discussionId: string,
+    noteId: number,
+    options: { body?: string; resolved?: boolean },
+  ) => Promise<MergeRequestDiscussionNote>;
+  mergeMergeRequest: (
+    project: string,
+    iid: number,
+    options?: {
+      sha?: string;
+      squash?: boolean;
+      removeSourceBranch?: boolean;
+      mergeWhenPipelineSucceeds?: boolean;
+      commitMessage?: string;
+    },
+  ) => Promise<MergeRequestMergeResult>;
 
   getCurrentUser: () => Promise<CurrentUser>;
   listProjects: (options: {
@@ -683,6 +758,44 @@ export function createGitlabFacade(config: Config, logger: Logger): GitLabFacade
     };
   }
 
+  function mapDiscussionPosition(p: any): MergeRequestDiscussionPosition | undefined {
+    if (!p || typeof p !== "object") return undefined;
+
+    const out: MergeRequestDiscussionPosition = {
+      position_type: typeof p.position_type === "string" ? p.position_type : undefined,
+      base_sha: typeof p.base_sha === "string" ? p.base_sha : undefined,
+      start_sha: typeof p.start_sha === "string" ? p.start_sha : undefined,
+      head_sha: typeof p.head_sha === "string" ? p.head_sha : undefined,
+      new_path: typeof p.new_path === "string" ? p.new_path : undefined,
+      new_line: typeof p.new_line === "number" ? p.new_line : undefined,
+      old_path: typeof p.old_path === "string" ? p.old_path : undefined,
+      old_line: typeof p.old_line === "number" ? p.old_line : undefined,
+    };
+
+    const hasAny = Object.values(out).some((v) => v !== undefined);
+    return hasAny ? out : undefined;
+  }
+
+  function mapDiscussionNote(n: any): MergeRequestDiscussionNote {
+    const base = mapNote(n);
+    return {
+      ...base,
+      resolved: typeof n?.resolved === "boolean" ? n.resolved : undefined,
+      resolvable: typeof n?.resolvable === "boolean" ? n.resolvable : undefined,
+      position: mapDiscussionPosition(n?.position),
+    };
+  }
+
+  function mapDiscussion(d: any): MergeRequestDiscussion {
+    const id = typeof d?.id === "string" ? d.id : String(d?.id ?? "");
+    const notes = Array.isArray(d?.notes) ? d.notes.map(mapDiscussionNote) : [];
+    return {
+      id,
+      individual_note: typeof d?.individual_note === "boolean" ? d.individual_note : undefined,
+      notes,
+    };
+  }
+
   return {
     async searchIssues(params) {
       const issues = await withRetry(logger, async () => {
@@ -881,6 +994,130 @@ export function createGitlabFacade(config: Config, logger: Logger): GitLabFacade
         ),
       );
       return mapNote(note);
+    },
+
+    async listMergeRequestDiscussions(project, iid, options) {
+      const discussions = await withRetry<any[]>(logger, () =>
+        fetchJson<any[]>(
+          `/projects/${encodeURIComponent(project)}/merge_requests/${encodeURIComponent(String(iid))}/discussions`,
+          { page: options.page, per_page: options.per_page },
+        ),
+      );
+      return discussions.map(mapDiscussion);
+    },
+
+    async createMergeRequestDiscussion(project, iid, body, options) {
+      const payload: any = { body };
+      if (options?.position) {
+        payload.position = {
+          position_type: "text",
+          base_sha: options.position.base_sha,
+          start_sha: options.position.start_sha,
+          head_sha: options.position.head_sha,
+          new_path: options.position.new_path,
+          new_line: options.position.new_line,
+          old_path: options.position.old_path,
+          old_line: options.position.old_line,
+        };
+      }
+
+      const discussion = await withRetry<any>(logger, () =>
+        fetchJson<any>(
+          `/projects/${encodeURIComponent(project)}/merge_requests/${encodeURIComponent(String(iid))}/discussions`,
+          undefined,
+          {
+            method: "POST",
+            headers: { "Content-Type": "application/json" },
+            body: JSON.stringify(payload),
+          },
+        ),
+      );
+      return mapDiscussion(discussion);
+    },
+
+    async addMergeRequestDiscussionNote(project, iid, discussionId, body) {
+      const note = await withRetry<any>(logger, () =>
+        fetchJson<any>(
+          `/projects/${encodeURIComponent(project)}/merge_requests/${encodeURIComponent(
+            String(iid),
+          )}/discussions/${encodeURIComponent(discussionId)}/notes`,
+          undefined,
+          {
+            method: "POST",
+            headers: { "Content-Type": "application/json" },
+            body: JSON.stringify({ body }),
+          },
+        ),
+      );
+      return mapDiscussionNote(note);
+    },
+
+    async updateMergeRequestDiscussionNote(project, iid, discussionId, noteId, options) {
+      const payload: any = {};
+      if (options.body !== undefined) payload.body = options.body;
+      if (options.resolved !== undefined) payload.resolved = options.resolved;
+
+      if (Object.keys(payload).length === 0) {
+        throw new Error("No updates provided.");
+      }
+
+      const note = await withRetry<any>(logger, () =>
+        fetchJson<any>(
+          `/projects/${encodeURIComponent(project)}/merge_requests/${encodeURIComponent(
+            String(iid),
+          )}/discussions/${encodeURIComponent(discussionId)}/notes/${encodeURIComponent(
+            String(noteId),
+          )}`,
+          undefined,
+          {
+            method: "PUT",
+            headers: { "Content-Type": "application/json" },
+            body: JSON.stringify(payload),
+          },
+        ),
+      );
+      return mapDiscussionNote(note);
+    },
+
+    async mergeMergeRequest(project, iid, options) {
+      const mr = await withRetry<any>(logger, () =>
+        fetchJson<any>(
+          `/projects/${encodeURIComponent(project)}/merge_requests/${encodeURIComponent(String(iid))}/merge`,
+          {
+            sha: options?.sha,
+            squash:
+              options?.squash === undefined ? undefined : options.squash ? "true" : "false",
+            should_remove_source_branch:
+              options?.removeSourceBranch === undefined
+                ? undefined
+                : options.removeSourceBranch
+                  ? "true"
+                  : "false",
+            merge_when_pipeline_succeeds:
+              options?.mergeWhenPipelineSucceeds === undefined
+                ? undefined
+                : options.mergeWhenPipelineSucceeds
+                  ? "true"
+                  : "false",
+            merge_commit_message: options?.commitMessage,
+          },
+          { method: "PUT" },
+        ),
+      );
+
+      return {
+        iid: mr.iid,
+        title: mr.title,
+        state: mr.state,
+        source_branch: mr.source_branch,
+        target_branch: mr.target_branch,
+        web_url: mr.web_url,
+        updated_at: mr.updated_at,
+        created_at: mr.created_at,
+        description: mr.description ?? "",
+        merged_at: typeof mr.merged_at === "string" ? mr.merged_at : undefined,
+        merge_commit_sha: typeof mr.merge_commit_sha === "string" ? mr.merge_commit_sha : undefined,
+      };
     },
 
     async getCurrentUser() {

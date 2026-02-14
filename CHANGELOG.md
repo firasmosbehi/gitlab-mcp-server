@@ -1,5 +1,9 @@
 # Changelog
 
+## 1.3.0
+
+- Merge requests: list/create discussions, reply to threads, resolve/unresolve discussion notes, and merge MRs.
+
 ## 1.2.0
 
 - Project discovery: current user, list projects, project details, branches/tags/labels.

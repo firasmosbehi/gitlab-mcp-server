@@ -2,9 +2,11 @@ import type { ToolDef } from "./types.js";
 
 import { gitlabAddIssueNoteTool } from "./gitlab_add_issue_note.js";
 import { gitlabAddMergeRequestNoteTool } from "./gitlab_add_merge_request_note.js";
+import { gitlabAddMergeRequestDiscussionNoteTool } from "./gitlab_add_merge_request_discussion_note.js";
 import { gitlabCreateBranchTool } from "./gitlab_create_branch.js";
 import { gitlabCreateCommitTool } from "./gitlab_create_commit.js";
 import { gitlabCreateIssueTool } from "./gitlab_create_issue.js";
+import { gitlabCreateMergeRequestDiscussionTool } from "./gitlab_create_merge_request_discussion.js";
 import { gitlabCreateMergeRequestTool } from "./gitlab_create_merge_request.js";
 import { gitlabCancelJobTool } from "./gitlab_cancel_job.js";
 import { gitlabCancelPipelineTool } from "./gitlab_cancel_pipeline.js";
@@ -21,6 +23,7 @@ import { gitlabGetPipelineTool } from "./gitlab_get_pipeline.js";
 import { gitlabGetProjectTool } from "./gitlab_get_project.js";
 import { gitlabListIssueNotesTool } from "./gitlab_list_issue_notes.js";
 import { gitlabListMergeRequestsTool } from "./gitlab_list_merge_requests.js";
+import { gitlabListMergeRequestDiscussionsTool } from "./gitlab_list_merge_request_discussions.js";
 import { gitlabListMergeRequestNotesTool } from "./gitlab_list_merge_request_notes.js";
 import { gitlabListPipelineJobsTool } from "./gitlab_list_pipeline_jobs.js";
 import { gitlabListPipelinesTool } from "./gitlab_list_pipelines.js";
@@ -29,6 +32,7 @@ import { gitlabListProjectLabelsTool } from "./gitlab_list_project_labels.js";
 import { gitlabListProjectsTool } from "./gitlab_list_projects.js";
 import { gitlabListRepoTreeTool } from "./gitlab_list_repo_tree.js";
 import { gitlabListTagsTool } from "./gitlab_list_tags.js";
+import { gitlabMergeMergeRequestTool } from "./gitlab_merge_merge_request.js";
 import { gitlabPlayJobTool } from "./gitlab_play_job.js";
 import { gitlabRetryJobTool } from "./gitlab_retry_job.js";
 import { gitlabRetryPipelineTool } from "./gitlab_retry_pipeline.js";
@@ -36,6 +40,7 @@ import { gitlabSearchJobLogTool } from "./gitlab_search_job_log.js";
 import { gitlabSearchIssuesTool } from "./gitlab_search_issues.js";
 import { gitlabSearchCodeTool } from "./gitlab_search_code.js";
 import { gitlabUpdateIssueTool } from "./gitlab_update_issue.js";
+import { gitlabUpdateMergeRequestDiscussionNoteTool } from "./gitlab_update_merge_request_discussion_note.js";
 
 export const TOOLS: ToolDef<any, any>[] = [
   gitlabGetCurrentUserTool,
@@ -51,6 +56,7 @@ export const TOOLS: ToolDef<any, any>[] = [
   gitlabListMergeRequestsTool,
   gitlabGetMergeRequestTool,
   gitlabListMergeRequestNotesTool,
+  gitlabListMergeRequestDiscussionsTool,
   gitlabGetFileTool,
   gitlabListRepoTreeTool,
   gitlabSearchCodeTool,
@@ -69,6 +75,10 @@ export const TOOLS: ToolDef<any, any>[] = [
   gitlabUpdateIssueTool,
   gitlabAddIssueNoteTool,
   gitlabAddMergeRequestNoteTool,
+  gitlabCreateMergeRequestDiscussionTool,
+  gitlabAddMergeRequestDiscussionNoteTool,
+  gitlabUpdateMergeRequestDiscussionNoteTool,
+  gitlabMergeMergeRequestTool,
   gitlabCreateBranchTool,
   gitlabCreateCommitTool,
   gitlabCreateMergeRequestTool,
