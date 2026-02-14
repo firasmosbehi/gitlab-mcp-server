@@ -21,6 +21,8 @@ import { gitlabGetJobLogTailTool } from "./gitlab_get_job_log_tail.js";
 import { gitlabGetMergeRequestChangesTool } from "./gitlab_get_merge_request_changes.js";
 import { gitlabGetMergeRequestTool } from "./gitlab_get_merge_request.js";
 import { gitlabGetPipelineTool } from "./gitlab_get_pipeline.js";
+import { gitlabGetLatestPipelineTool } from "./gitlab_get_latest_pipeline.js";
+import { gitlabGetPipelineTestReportSummaryTool } from "./gitlab_get_pipeline_test_report_summary.js";
 import { gitlabGetProjectTool } from "./gitlab_get_project.js";
 import { gitlabListIssueNotesTool } from "./gitlab_list_issue_notes.js";
 import { gitlabListMergeRequestsTool } from "./gitlab_list_merge_requests.js";
@@ -68,7 +70,9 @@ export const TOOLS: ToolDef<any, any>[] = [
   gitlabSearchCodeTool,
   gitlabListPipelinesTool,
   gitlabGetPipelineTool,
+  gitlabGetLatestPipelineTool,
   gitlabListPipelineVariablesTool,
+  gitlabGetPipelineTestReportSummaryTool,
   gitlabListPipelineJobsTool,
   gitlabGetJobLogTool,
   gitlabGetJobLogTailTool,

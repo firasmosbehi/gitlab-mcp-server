@@ -1,5 +1,9 @@
 # Changelog
 
+## 1.6.0
+
+- CI: get latest pipeline and fetch pipeline test report summaries.
+
 ## 1.5.0
 
 - CI: create pipelines, trigger pipelines (trigger token), and list pipeline variables.

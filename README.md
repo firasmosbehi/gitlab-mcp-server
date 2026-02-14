@@ -10,7 +10,7 @@ Model Context Protocol (MCP) server for GitLab: issues, merge requests, reposito
 - Repo files: read a file from a ref (branch/tag/sha)
 - Repo navigation: list repo tree, search code
 - MR context: bounded diff summaries via MR changes
-- CI: list pipelines, inspect a pipeline, list pipeline variables, list pipeline jobs, fetch job logs (plus tail/search)
+- CI: list pipelines, inspect a pipeline (or latest), list pipeline variables, list pipeline jobs, fetch job logs (plus tail/search), test report summary
 - CI actions (guarded): create/trigger pipeline; retry/cancel/play job; retry/cancel pipeline
 - Artifacts: fetch artifacts metadata and download artifacts archive (size-limited)
 - Write (guarded): create branch, create commit (multi-file actions), create merge request
@@ -161,7 +161,9 @@ Tool names exposed by this server:
 - `gitlab_search_code`
 - `gitlab_list_pipelines`
 - `gitlab_get_pipeline`
+- `gitlab_get_latest_pipeline`
 - `gitlab_list_pipeline_variables`
+- `gitlab_get_pipeline_test_report_summary`
 - `gitlab_list_pipeline_jobs`
 - `gitlab_get_job_log`
 - `gitlab_get_job_log_tail`

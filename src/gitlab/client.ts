@@ -77,6 +77,32 @@ export type PipelineVariable = Readonly<{
   value: string;
 }>;
 
+export type PipelineTestReportTotal = Readonly<{
+  time: number;
+  count: number;
+  success: number;
+  failed: number;
+  skipped: number;
+  error: number;
+  suite_error: string | null;
+}>;
+
+export type PipelineTestSuiteSummary = Readonly<{
+  name: string;
+  total_time: number;
+  total_count: number;
+  success_count: number;
+  failed_count: number;
+  skipped_count: number;
+  error_count: number;
+}>;
+
+export type PipelineTestReportSummary = Readonly<{
+  total: PipelineTestReportTotal;
+  test_suites?: PipelineTestSuiteSummary[];
+  is_truncated: boolean;
+}>;
+
 export type PipelineJobSummary = Readonly<{
   id: number;
   name: string;
@@ -421,7 +447,13 @@ export interface GitLabFacade {
   getMergeRequestChanges: (project: string, iid: number) => Promise<any>;
   listPipelines: (params: ListPipelinesParams) => Promise<PipelineSummary[]>;
   getPipeline: (project: string, pipelineId: number) => Promise<PipelineDetail>;
+  getLatestPipeline: (project: string, ref?: string) => Promise<PipelineDetail>;
   listPipelineVariables: (project: string, pipelineId: number) => Promise<PipelineVariable[]>;
+  getPipelineTestReportSummary: (
+    project: string,
+    pipelineId: number,
+    options?: { includeSuites?: boolean; maxSuites?: number },
+  ) => Promise<PipelineTestReportSummary>;
   createPipeline: (
     project: string,
     ref: string,
@@ -1510,12 +1542,81 @@ export function createGitlabFacade(config: Config, logger: Logger): GitLabFacade
       };
     },
 
+    async getLatestPipeline(project, ref) {
+      const p = await withRetry<any>(logger, () =>
+        api.Pipelines.showLatest(project, ref ? { ref } : undefined),
+      );
+
+      const id = typeof p?.id === "number" ? p.id : Number(p?.id);
+      const createdAt = typeof p?.created_at === "string" ? p.created_at : "";
+      const updatedAt =
+        typeof p?.updated_at === "string"
+          ? p.updated_at
+          : typeof p?.updatedAt === "string"
+            ? p.updatedAt
+            : createdAt;
+
+      return {
+        id: Number.isFinite(id) ? id : 0,
+        status: p?.status ?? "",
+        ref: p?.ref ?? ref ?? "",
+        sha: p?.sha ?? "",
+        web_url: p?.web_url ?? "",
+        updated_at: updatedAt,
+        created_at: createdAt,
+      };
+    },
+
     async listPipelineVariables(project, pipelineId) {
       const vars = await withRetry<any[]>(logger, () => api.Pipelines.allVariables(project, pipelineId));
       return (vars as any[]).map((v) => ({
         key: typeof v?.key === "string" ? v.key : "",
         value: typeof v?.value === "string" ? v.value : String(v?.value ?? ""),
       }));
+    },
+
+    async getPipelineTestReportSummary(project, pipelineId, options) {
+      const report = await withRetry<any>(logger, () =>
+        api.Pipelines.showTestReportSummary(project, pipelineId),
+      );
+
+      const total = report?.total ?? {};
+      const safeNumber = (v: any) => {
+        if (typeof v === "number") return Number.isFinite(v) ? v : 0;
+        const n = Number(v);
+        return Number.isFinite(n) ? n : 0;
+      };
+
+      const outTotal: PipelineTestReportTotal = {
+        time: safeNumber(total.time),
+        count: safeNumber(total.count),
+        success: safeNumber(total.success),
+        failed: safeNumber(total.failed),
+        skipped: safeNumber(total.skipped),
+        error: safeNumber(total.error),
+        suite_error:
+          typeof total.suite_error === "string" || total.suite_error === null ? total.suite_error : null,
+      };
+
+      const includeSuites = options?.includeSuites ?? false;
+      if (!includeSuites) return { total: outTotal, is_truncated: false };
+
+      const maxSuitesRaw = typeof options?.maxSuites === "number" ? options.maxSuites : 20;
+      const maxSuites = Math.max(1, Math.min(200, safeNumber(maxSuitesRaw)));
+
+      const suitesRaw = Array.isArray(report?.test_suites) ? report.test_suites : [];
+      const isTruncated = suitesRaw.length > maxSuites;
+      const suites = suitesRaw.slice(0, maxSuites).map((s: any) => ({
+        name: typeof s?.name === "string" ? s.name : "",
+        total_time: safeNumber(s?.total_time),
+        total_count: safeNumber(s?.total_count),
+        success_count: safeNumber(s?.success_count),
+        failed_count: safeNumber(s?.failed_count),
+        skipped_count: safeNumber(s?.skipped_count),
+        error_count: safeNumber(s?.error_count),
+      }));
+
+      return { total: outTotal, test_suites: suites, is_truncated: isTruncated };
     },
 
     async createPipeline(project, ref, options) {
