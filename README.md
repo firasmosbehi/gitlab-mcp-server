@@ -100,6 +100,20 @@ Tool names exposed by this server:
 - `gitlab_create_commit`
 - `gitlab_create_merge_request`
 
+## MCP Resources and Prompts
+
+Resources:
+
+- `gitlab://help`
+- `gitlab://file?project=<...>&ref=<...>&path=<...>`
+- `gitlab://job-log?project=<...>&job_id=<...>&max_chars=<...>`
+
+Prompts:
+
+- `triage_issue`
+- `review_merge_request`
+- `debug_ci_job`
+
 ## Security
 
 Treat `GITLAB_TOKEN` like a password. Prefer least-privilege tokens and avoid granting write scopes unless you need them.
