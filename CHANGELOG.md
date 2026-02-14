@@ -1,5 +1,9 @@
 # Changelog
 
+## 1.4.0
+
+- Merge requests: update metadata (title/description/labels/assignees/reviewers/target branch), close/reopen, and approve/unapprove.
+
 ## 1.3.0
 
 - Merge requests: list/create discussions, reply to threads, resolve/unresolve discussion notes, and merge MRs.

@@ -3,6 +3,7 @@ import type { ToolDef } from "./types.js";
 import { gitlabAddIssueNoteTool } from "./gitlab_add_issue_note.js";
 import { gitlabAddMergeRequestNoteTool } from "./gitlab_add_merge_request_note.js";
 import { gitlabAddMergeRequestDiscussionNoteTool } from "./gitlab_add_merge_request_discussion_note.js";
+import { gitlabApproveMergeRequestTool } from "./gitlab_approve_merge_request.js";
 import { gitlabCreateBranchTool } from "./gitlab_create_branch.js";
 import { gitlabCreateCommitTool } from "./gitlab_create_commit.js";
 import { gitlabCreateIssueTool } from "./gitlab_create_issue.js";
@@ -41,6 +42,8 @@ import { gitlabSearchIssuesTool } from "./gitlab_search_issues.js";
 import { gitlabSearchCodeTool } from "./gitlab_search_code.js";
 import { gitlabUpdateIssueTool } from "./gitlab_update_issue.js";
 import { gitlabUpdateMergeRequestDiscussionNoteTool } from "./gitlab_update_merge_request_discussion_note.js";
+import { gitlabUpdateMergeRequestTool } from "./gitlab_update_merge_request.js";
+import { gitlabUnapproveMergeRequestTool } from "./gitlab_unapprove_merge_request.js";
 
 export const TOOLS: ToolDef<any, any>[] = [
   gitlabGetCurrentUserTool,
@@ -73,11 +76,14 @@ export const TOOLS: ToolDef<any, any>[] = [
   // Write tools (guarded by read-only mode / allowlists)
   gitlabCreateIssueTool,
   gitlabUpdateIssueTool,
+  gitlabUpdateMergeRequestTool,
   gitlabAddIssueNoteTool,
   gitlabAddMergeRequestNoteTool,
   gitlabCreateMergeRequestDiscussionTool,
   gitlabAddMergeRequestDiscussionNoteTool,
   gitlabUpdateMergeRequestDiscussionNoteTool,
+  gitlabApproveMergeRequestTool,
+  gitlabUnapproveMergeRequestTool,
   gitlabMergeMergeRequestTool,
   gitlabCreateBranchTool,
   gitlabCreateCommitTool,

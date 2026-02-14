@@ -49,6 +49,15 @@ export type MergeRequestMergeResult = MergeRequestDetail &
     merge_commit_sha?: string;
   }>;
 
+export type MergeRequestApprovalSummary = Readonly<{
+  approved: boolean;
+  approvals_required?: number;
+  approvals_left?: number;
+  user_has_approved?: boolean;
+  user_can_approve?: boolean;
+  approved_by_usernames?: string[];
+}>;
+
 export type PipelineSummary = Readonly<{
   id: number;
   status: string;
@@ -335,6 +344,33 @@ export interface GitLabFacade {
     noteId: number,
     options: { body?: string; resolved?: boolean },
   ) => Promise<MergeRequestDiscussionNote>;
+  updateMergeRequest: (
+    project: string,
+    iid: number,
+    options: {
+      title?: string;
+      description?: string;
+      stateEvent?: "close" | "reopen";
+      labels?: string[] | string;
+      addLabels?: string[] | string;
+      removeLabels?: string[] | string;
+      assigneeId?: number;
+      reviewerIds?: number[];
+      targetBranch?: string;
+      removeSourceBranch?: boolean;
+      squash?: boolean;
+    },
+  ) => Promise<MergeRequestDetail>;
+  approveMergeRequest: (
+    project: string,
+    iid: number,
+    options?: { sha?: string },
+  ) => Promise<MergeRequestApprovalSummary>;
+  unapproveMergeRequest: (
+    project: string,
+    iid: number,
+    options?: { sha?: string },
+  ) => Promise<MergeRequestApprovalSummary>;
   mergeMergeRequest: (
     project: string,
     iid: number,
@@ -796,6 +832,43 @@ export function createGitlabFacade(config: Config, logger: Logger): GitLabFacade
     };
   }
 
+  function mapApprovalSummary(v: any): MergeRequestApprovalSummary {
+    const approvalsLeft =
+      typeof v?.approvals_left === "number"
+        ? v.approvals_left
+        : typeof v?.approvalsLeft === "number"
+          ? v.approvalsLeft
+          : undefined;
+    const approved =
+      typeof v?.approved === "boolean"
+        ? v.approved
+        : approvalsLeft !== undefined
+          ? approvalsLeft === 0
+          : false;
+
+    const approvalsRequired =
+      typeof v?.approvals_required === "number"
+        ? v.approvals_required
+        : typeof v?.approvalsRequired === "number"
+          ? v.approvalsRequired
+          : undefined;
+
+    const approvedByUsernames = Array.isArray(v?.approved_by)
+      ? v.approved_by
+          .map((x: any) => x?.user?.username)
+          .filter((u: any) => typeof u === "string")
+      : undefined;
+
+    return {
+      approved,
+      approvals_required: approvalsRequired,
+      approvals_left: approvalsLeft,
+      user_has_approved: typeof v?.user_has_approved === "boolean" ? v.user_has_approved : undefined,
+      user_can_approve: typeof v?.user_can_approve === "boolean" ? v.user_can_approve : undefined,
+      approved_by_usernames: approvedByUsernames,
+    };
+  }
+
   return {
     async searchIssues(params) {
       const issues = await withRetry(logger, async () => {
@@ -1077,6 +1150,98 @@ export function createGitlabFacade(config: Config, logger: Logger): GitLabFacade
         ),
       );
       return mapDiscussionNote(note);
+    },
+
+    async updateMergeRequest(project, iid, options) {
+      const payload: any = {};
+      if (options.title !== undefined) payload.title = options.title;
+      if (options.description !== undefined) payload.description = options.description;
+      if (options.stateEvent !== undefined) payload.state_event = options.stateEvent;
+      if (options.labels !== undefined) {
+        payload.labels = Array.isArray(options.labels) ? options.labels.join(",") : options.labels;
+      }
+      if (options.addLabels !== undefined) {
+        payload.add_labels = Array.isArray(options.addLabels)
+          ? options.addLabels.join(",")
+          : options.addLabels;
+      }
+      if (options.removeLabels !== undefined) {
+        payload.remove_labels = Array.isArray(options.removeLabels)
+          ? options.removeLabels.join(",")
+          : options.removeLabels;
+      }
+      if (options.assigneeId !== undefined) payload.assignee_id = options.assigneeId;
+      if (options.reviewerIds !== undefined) payload.reviewer_ids = options.reviewerIds;
+      if (options.targetBranch !== undefined) payload.target_branch = options.targetBranch;
+      if (options.removeSourceBranch !== undefined)
+        payload.remove_source_branch = options.removeSourceBranch;
+      if (options.squash !== undefined) payload.squash = options.squash;
+
+      if (Object.keys(payload).length === 0) {
+        throw new Error("No updates provided.");
+      }
+
+      const mr = await withRetry<any>(logger, () =>
+        fetchJson<any>(
+          `/projects/${encodeURIComponent(project)}/merge_requests/${encodeURIComponent(String(iid))}`,
+          undefined,
+          {
+            method: "PUT",
+            headers: { "Content-Type": "application/json" },
+            body: JSON.stringify(payload),
+          },
+        ),
+      );
+
+      return {
+        iid: mr.iid,
+        title: mr.title,
+        state: mr.state,
+        source_branch: mr.source_branch,
+        target_branch: mr.target_branch,
+        web_url: mr.web_url,
+        updated_at: mr.updated_at,
+        created_at: mr.created_at,
+        description: mr.description ?? "",
+      };
+    },
+
+    async approveMergeRequest(project, iid, options) {
+      const payload: any = {};
+      if (options?.sha) payload.sha = options.sha;
+
+      const res = await withRetry<any>(logger, () =>
+        fetchJson<any>(
+          `/projects/${encodeURIComponent(project)}/merge_requests/${encodeURIComponent(String(iid))}/approve`,
+          undefined,
+          {
+            method: "POST",
+            headers: { "Content-Type": "application/json" },
+            body: JSON.stringify(payload),
+          },
+        ),
+      );
+      return mapApprovalSummary(res);
+    },
+
+    async unapproveMergeRequest(project, iid, options) {
+      const payload: any = {};
+      if (options?.sha) payload.sha = options.sha;
+
+      const res = await withRetry<any>(logger, () =>
+        fetchJson<any>(
+          `/projects/${encodeURIComponent(project)}/merge_requests/${encodeURIComponent(
+            String(iid),
+          )}/unapprove`,
+          undefined,
+          {
+            method: "POST",
+            headers: { "Content-Type": "application/json" },
+            body: JSON.stringify(payload),
+          },
+        ),
+      );
+      return mapApprovalSummary(res);
     },
 
     async mergeMergeRequest(project, iid, options) {
